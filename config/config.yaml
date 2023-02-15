@@ -1,0 +1,516 @@
+# Directories
+workdir: '/path/'
+outdir: '/path/results'
+logdir: '/path/results'
+
+# Random seeds
+cluster_random_seed: 123
+
+# Sample names (in same order as filtered matrices)
+follicular_sample_names:
+  - TFRIPAIR2_FL
+  - TFRIPAIR2_DLBCL
+  - TFRIPAIR3_FL
+  - TFRIPAIR3_DLBCL
+  - TFRIPAIR4_FL
+  - TFRIPAIR4_DLBCL
+  - TFRIPAIR5_FL
+  - TFRIPAIR5_DLBCL
+  - TFRIPAIR6_FL
+  - TFRIPAIR6_DLBCL
+  - TFRIPAIR7_FL
+  - TFRIPAIR7_DLBCL
+  - TFRIPAIR8_FL
+  - TFRIPAIR8_DLBCL
+  - TFRIPAIR9_FL
+  - TFRIPAIR9_DLBCL
+  - TFRIPAIR10_FL
+  - TFRIPAIR10_DLBCL
+  - TFRIPAIR11_FL
+  - TFRIPAIR11_DLBCL
+  - TFRIPAIR12_FL
+  - TFRIPAIR12_DLBCL
+  - TFRIPAIR13_FL
+  - TFRIPAIR13_DLBCL
+  - TFRI_Cont_2
+  - TFRI_Cont_3
+  - TFRI_Cont_4
+  - TFRI_Cont_5
+  - TFRI_Cont_6
+  - TFRI_Cont_8
+  - TFRI_Cont_9
+  - TFRI_Cont_10
+  - TFRI_Cont_11
+  - TFRI_Cont_12
+  - TFRI_Cont_13
+  - RLN02
+  - RLN03
+  
+# Paths to filtered gene expression matrices
+follicular_data:
+  TFRIPAIR2_FL:
+    dataset: TFRIPAIR2_FL
+    patient: TFRIPAIR2
+    batch: PAIR2
+    timepoint: FL
+    progression_status: primary
+    patient_progression_status: transformed
+    filtered_matrix_path: '/cellranger_output/TFRIPAIR2_FL/filtered_feature_bc_matrix'
+  
+  TFRIPAIR2_DLBCL:
+    dataset: TFRIPAIR2_DLBCL
+    patient: TFRIPAIR2
+    batch: PAIR2
+    timepoint: DLBCL
+    progression_status: transformed
+    patient_progression_status: transformed
+    filtered_matrix_path: '/cellranger_output/TFRIPAIR2_DLBCL/filtered_feature_bc_matrix'
+
+  TFRIPAIR3_FL:
+    dataset: TFRIPAIR3_FL
+    patient: TFRIPAIR3
+    batch: PAIR3
+    timepoint: FL
+    progression_status: primary
+    patient_progression_status: transformed
+    filtered_matrix_path: '/cellranger_output/TFRIPAIR3_FL/filtered_feature_bc_matrix'
+  
+  TFRIPAIR3_DLBCL:
+    dataset: TFRIPAIR3_DLBCL
+    patient: TFRIPAIR3
+    batch: PAIR3
+    timepoint: DLBCL
+    progression_status: transformed
+    patient_progression_status: transformed
+    filtered_matrix_path: '/cellranger_output/TFRIPAIR3_DLBCL/filtered_feature_bc_matrix'
+
+  TFRIPAIR4_FL:
+    dataset: TFRIPAIR4_FL
+    patient: TFRIPAIR4
+    batch: PAIR4
+    timepoint: FL
+    progression_status: primary
+    patient_progression_status: transformed
+    filtered_matrix_path: '/cellranger_output/TFRIPAIR4_FL/filtered_feature_bc_matrix'
+  
+  TFRIPAIR4_DLBCL:
+    dataset: TFRIPAIR4_DLBCL
+    patient: TFRIPAIR4
+    batch: PAIR4
+    timepoint: DLBCL
+    progression_status: transformed
+    patient_progression_status: transformed
+    filtered_matrix_path: '/cellranger_output/TFRIPAIR4_DLBCL/filtered_feature_bc_matrix'
+
+  TFRIPAIR5_FL:
+    dataset: TFRIPAIR5_FL
+    patient: TFRIPAIR5
+    batch: PAIR5
+    timepoint: FL
+    progression_status: primary
+    patient_progression_status: transformed
+    filtered_matrix_path: '/cellranger_output/TFRIPAIR5_FL/filtered_feature_bc_matrix'
+  
+  TFRIPAIR5_DLBCL:
+    dataset: TFRIPAIR5_DLBCL
+    patient: TFRIPAIR5
+    batch: PAIR5
+    timepoint: DLBCL
+    progression_status: transformed
+    patient_progression_status: transformed
+    filtered_matrix_path: '/cellranger_output/TFRIPAIR5_DLBCL/filtered_feature_bc_matrix' 
+
+  TFRIPAIR6_FL:
+    dataset: TFRIPAIR6_FL
+    patient: TFRIPAIR6
+    batch: PAIR6
+    timepoint: FL
+    progression_status: primary
+    patient_progression_status: transformed
+    filtered_matrix_path: '/cellranger_output/TFRIPAIR6_FL/filtered_feature_bc_matrix'
+
+  TFRIPAIR6_DLBCL:
+    dataset: TFRIPAIR6_DLBCL
+    patient: TFRIPAIR6
+    batch: PAIR6
+    timepoint: DLBCL
+    progression_status: transformed
+    patient_progression_status: transformed
+    filtered_matrix_path: '/cellranger_output/TFRIPAIR6_DLBCL/filtered_feature_bc_matrix'
+
+  TFRIPAIR8_FL:
+    dataset: TFRIPAIR8_FL
+    patient: TFRIPAIR8
+    batch: PAIR8
+    timepoint: FL
+    progression_status: primary
+    patient_progression_status: transformed
+    filtered_matrix_path: '/cellranger_output/TFRIPAIR8_FL/filtered_feature_bc_matrix'
+
+  TFRIPAIR8_DLBCL:
+    dataset: TFRIPAIR8_DLBCL
+    patient: TFRIPAIR8
+    batch: PAIR8
+    timepoint: DLBCL
+    progression_status: transformed
+    patient_progression_status: transformed
+    filtered_matrix_path: '/cellranger_output/TFRIPAIR8_DLBCL/filtered_feature_bc_matrix'
+
+  TFRIPAIR9_FL:
+    dataset: TFRIPAIR9_FL
+    patient: TFRIPAIR9
+    batch: PAIR9
+    timepoint: FL
+    progression_status: primary
+    patient_progression_status: transformed
+    filtered_matrix_path: '/cellranger_output/TFRIPAIR9_FL/filtered_feature_bc_matrix'
+
+  TFRIPAIR9_DLBCL:
+    dataset: TFRIPAIR9_DLBCL
+    patient: TFRIPAIR9
+    batch: PAIR9
+    timepoint: DLBCL
+    progression_status: transformed
+    patient_progression_status: transformed
+    filtered_matrix_path: '/cellranger_output/TFRIPAIR9_DLBCL/filtered_feature_bc_matrix'
+
+  TFRIPAIR10_FL:
+    dataset: TFRIPAIR10_FL
+    patient: TFRIPAIR10
+    batch: PAIR10
+    timepoint: FL
+    progression_status: primary
+    patient_progression_status: transformed
+    filtered_matrix_path: '/cellranger_output/TFRIPAIR10_FL/filtered_feature_bc_matrix'
+
+  TFRIPAIR10_DLBCL:
+    dataset: TFRIPAIR10_DLBCL
+    patient: TFRIPAIR10
+    batch: PAIR10
+    timepoint: DLBCL
+    progression_status: transformed
+    patient_progression_status: transformed
+    filtered_matrix_path: '/cellranger_output/TFRIPAIR10_DLBCL/filtered_feature_bc_matrix'
+
+  TFRIPAIR11_FL:
+    dataset: TFRIPAIR11_FL
+    patient: TFRIPAIR11
+    batch: PAIR11
+    timepoint: FL
+    progression_status: primary
+    patient_progression_status: transformed
+    filtered_matrix_path: '/cellranger_output/TFRIPAIR11_FL/filtered_feature_bc_matrix'
+
+  TFRIPAIR11_DLBCL:
+    dataset: TFRIPAIR11_DLBCL
+    patient: TFRIPAIR11
+    batch: PAIR11
+    timepoint: DLBCL
+    progression_status: transformed
+    patient_progression_status: transformed
+    filtered_matrix_path: '/cellranger_output/TFRIPAIR11_DLBCL/filtered_feature_bc_matrix'
+
+  TFRIPAIR12_FL:
+    dataset: TFRIPAIR12_FL
+    patient: TFRIPAIR12
+    batch: PAIR12
+    timepoint: FL
+    progression_status: primary
+    patient_progression_status: transformed
+    filtered_matrix_path: '/cellranger_output/TFRIPAIR12_FL/filtered_feature_bc_matrix'
+
+  TFRIPAIR12_DLBCL:
+    dataset: TFRIPAIR12_DLBCL
+    patient: TFRIPAIR12
+    batch: PAIR12
+    timepoint: DLBCL
+    progression_status: transformed
+    patient_progression_status: transformed
+    filtered_matrix_path: '/cellranger_output/TFRIPAIR12_DLBCL/filtered_feature_bc_matrix'
+
+  TFRIPAIR13_FL:
+    dataset: TFRIPAIR13_FL
+    patient: TFRIPAIR13
+    batch: PAIR13
+    timepoint: FL
+    progression_status: primary
+    patient_progression_status: transformed
+    filtered_matrix_path: '/cellranger_output/TFRIPAIR13_FL/filtered_feature_bc_matrix'
+
+  TFRIPAIR13_DLBCL:
+    dataset: TFRIPAIR13_DLBCL
+    patient: TFRIPAIR13
+    batch: PAIR13
+    timepoint: DLBCL
+    progression_status: transformed
+    patient_progression_status: transformed
+    filtered_matrix_path: '/cellranger_output/TFRIPAIR13_DLBCL/filtered_feature_bc_matrix'
+
+  TFRIPAIR14_FL:
+    dataset: TFRIPAIR14_FL
+    patient: TFRIPAIR14
+    batch: PAIR14
+    timepoint: FL
+    progression_status: primary
+    patient_progression_status: transformed
+    filtered_matrix_path: '/cellranger_output/TFRIPAIR14_FL/filtered_feature_bc_matrix'
+
+  TFRIPAIR14_DLBCL:
+    dataset: TFRIPAIR14_DLBCL
+    patient: TFRIPAIR14
+    batch: PAIR14
+    timepoint: DLBCL
+    progression_status: transformed
+    patient_progression_status: transformed
+    filtered_matrix_path: '/cellranger_output/TFRIPAIR14_DLBCL/filtered_feature_bc_matrix'
+
+  TFRI_Cont_2:
+    dataset: TFRI_Cont_2
+    patient: TFRI_Cont_2
+    batch: PAIR2
+    timepoint: FL_cont
+    progression_status: primary
+    patient_progression_status: none
+    filtered_matrix_path: '/cellranger_output/TFRI_Cont_2/filtered_feature_bc_matrix'
+
+  TFRI_Cont_3:
+    dataset: TFRI_Cont_3
+    patient: TFRI_Cont_3
+    batch: PAIR3
+    timepoint: FL_cont
+    progression_status: primary
+    patient_progression_status: none
+    filtered_matrix_path: '/cellranger_output/TFRI_Cont_3/filtered_feature_bc_matrix'
+
+  TFRI_Cont_4:
+    dataset: TFRI_Cont_4
+    patient: TFRI_Cont_4
+    batch: PAIR4
+    timepoint: FL_cont
+    progression_status: primary
+    patient_progression_status: none
+    filtered_matrix_path: '/cellranger_output/TFRI_Cont_4/filtered_feature_bc_matrix'
+
+  TFRI_Cont_5:
+    dataset: TFRI_Cont_5
+    patient: TFRI_Cont_5
+    batch: PAIR5
+    timepoint: FL_cont
+    progression_status: primary
+    patient_progression_status: none
+    filtered_matrix_path: '/cellranger_output/TFRI_Cont_5/filtered_feature_bc_matrix'
+
+  TFRI_Cont_6:
+    dataset: TFRI_Cont_6
+    patient: TFRI_Cont_6
+    batch: PAIR6
+    timepoint: FL_cont
+    progression_status: primary
+    patient_progression_status: none
+    filtered_matrix_path: '/cellranger_output/TFRI_Cont_6/filtered_feature_bc_matrix'
+
+  TFRI_Cont_8:
+    dataset: TFRI_Cont_8
+    patient: TFRI_Cont_8
+    batch: PAIR8
+    timepoint: FL_cont
+    progression_status: primary
+    patient_progression_status: none
+    filtered_matrix_path: '/cellranger_output/TFRI_Cont_8/filtered_feature_bc_matrix'
+
+  TFRI_Cont_9:
+    dataset: TFRI_Cont_9
+    patient: TFRI_Cont_9
+    batch: PAIR9
+    timepoint: FL_cont
+    progression_status: primary
+    patient_progression_status: none
+    filtered_matrix_path: '/cellranger_output/TFRI_Cont_9/filtered_feature_bc_matrix'
+
+  TFRI_Cont_10:
+    dataset: TFRI_Cont_10
+    patient: TFRI_Cont_10
+    batch: PAIR10
+    timepoint: FL_cont
+    progression_status: primary
+    patient_progression_status: none
+    filtered_matrix_path: '/cellranger_output/TFRI_Cont_10/filtered_feature_bc_matrix'
+
+  TFRI_Cont_11:
+    dataset: TFRI_Cont_11
+    patient: TFRI_Cont_11
+    batch: PAIR11
+    timepoint: FL_cont
+    progression_status: primary
+    patient_progression_status: none
+    filtered_matrix_path: '/cellranger_output/TFRI_Cont_11/filtered_feature_bc_matrix'
+
+  TFRI_Cont_12:
+    dataset: TFRI_Cont_12
+    patient: TFRI_Cont_12
+    batch: PAIR12
+    timepoint: FL_cont
+    progression_status: primary
+    patient_progression_status: none
+    filtered_matrix_path: '/cellranger_output/TFRI_Cont_12/filtered_feature_bc_matrix'
+
+  TFRI_Cont_13:
+    dataset: TFRI_Cont_13
+    patient: TFRI_Cont_13
+    batch: PAIR13
+    timepoint: FL_cont
+    progression_status: primary
+    patient_progression_status: none
+    filtered_matrix_path: '/cellranger_output/TFRI_Cont_13/filtered_feature_bc_matrix'
+
+  RLN02:
+    dataset: RLN02
+    patient: RLN02
+    batch: PAIR13
+    timepoint: RLN
+    progression_status: none
+    patient_progression_status: none
+    filtered_matrix_path: '/cellranger_output/RLN02/filtered_feature_bc_matrix'
+
+  RLN03:
+    dataset: RLN03
+    patient: RLN03
+    batch: PAIR13
+    timepoint: RLN
+    progression_status: none
+    patient_progression_status: none
+    filtered_matrix_path: '/cellranger_output/RLN03/filtered_feature_bc_matrix'
+
+# Unsupervised clustering settings
+cluster_settings:
+  follicular_t:
+    methods: 
+      - 'seurat_0.8'
+      - 'phenograph'
+    use_method: 'seurat'
+    celltypes:
+      - T_reg
+      - T_Cytotoxic
+      - TFH
+  follicular_b:
+    methods: 
+      - 'seurat_0.8'
+      - 'phenograph'
+    use_method: 'phenograph'
+    celltypes:
+      - B\ cells
+  follicular_malignant:
+    methods:
+      - 'seurat_0.8'
+      - 'phenograph'
+    use_method: 'phenograph'
+    celltypes:
+      - B\ cells\ \(malignant\)
+  follicular_all:
+    methods:
+      - 'seurat_0.8'
+      - 'seurat_1.2'
+      - 'SC3'
+    use_method: 'seurat_0.8'
+  follicular_all_subset:
+    methods:
+      - 'seurat_0.8'
+      - 'seurat_1.2'
+    use_method: 'seurat_0.8'
+
+# Filtering thresholds
+filter_settings:
+  mito_thres: 10
+  ribo_thres: 60
+
+# Differential expression settings
+differential_expression_settings:
+  ReactomePA:
+    gene_method: voom
+    num_genes: 50
+    # Minimum number of UMIs to test a gene for DE
+    min_gene_counts: 500
+    celltype_groups:
+      cytotoxic:
+        - T_Cytotoxic
+      follicular_helper:
+        - TFH
+      malignant:
+        - B\ cells\ \(malignant\)
+      b:
+       - B\ cells
+      helper:
+        - TH1
+    patient_groups:
+      TFRIPAIR2:
+        - TFRIPAIR2
+      TFRIPAIR3:
+        - TFRIPAIR3
+      TFRIPAIR4:
+        - TFRIPAIR4
+      TFRIPAIR5:
+        - TFRIPAIR5
+      TFRIPAIR6:
+        - TFRIPAIR6
+      TFRIPAIR8:
+        - TFRIPAIR8
+      TFRIPAIR9:
+        - TFRIPAIR9
+      TFRIPAIR10:
+        - TFRIPAIR10
+      TFRIPAIR11:
+        - TFRIPAIR11
+      TFRIPAIR12:
+        - TFRIPAIR12
+      TFRIPAIR13:
+        - TFRIPAIR13
+
+  fgsea:
+    gene_method: scran
+    # Minimum number of UMIs to test a gene for DE
+    min_gene_counts: 500
+    celltype_groups:
+      malignant:
+        - B\ cells\ \(malignant\)
+    patient_groups:
+      TFRIPAIR2:
+        - TFRIPAIR2
+      TFRIPAIR3:
+        - TFRIPAIR3
+      TFRIPAIR4:
+        - TFRIPAIR4
+      TFRIPAIR5:
+        - TFRIPAIR5
+      TFRIPAIR6:
+        - TFRIPAIR6
+      TFRIPAIR8:
+        - TFRIPAIR8
+      TFRIPAIR9:
+        - TFRIPAIR9
+      TFRIPAIR10:
+        - TFRIPAIR10
+      TFRIPAIR11:
+        - TFRIPAIR11
+      TFRIPAIR12:
+        - TFRIPAIR12
+      TFRIPAIR13:
+        - TFRIPAIR13
+
+  
+b_cell_labels:
+  - B\ cells
+  - B\ cells\ \(malignant\)
+
+gene_sets: 
+  reactome: '/Users/shaochwu/Dropbox/my10x/c2.cp.reactome.v7.0.symbols.gmt'
+  hallmark: '/Users/shaochwu/Dropbox/my10x/h.all.v7.0.symbols.gmt'
+
+# Settings for batch correction
+batch_correction_settings:
+  method: scanorama
+  batch_variable: batch
+
+
+
+
+
