@@ -1,0 +1,66 @@
+configfile: "../config/v1.yaml"
+
+workflow_name = 'align_clones'
+outdir = os.path.join(config['outdir'], workflow_name)
+log_dir = os.path.join(config['logdir'], workflow_name)
+
+
+# Get group for a given sample
+def get_sample_group(sample):
+    group_mapping = config['integrate']['groups']
+    sample_mapping = {}
+    for k,v in group_mapping.items():
+        for x in v:
+            sample_mapping.setdefault(x,[]).append(k)
+
+    return sample_mapping[sample][0]
+
+
+rule all:
+    # All the output files
+    input:
+        '{outdir}/clonealign_fit/{{sample}}.rds'.format(
+            outdir=output_dir
+        )
+
+# run clonealign
+rule run_clonealign:
+    input:
+        clone_cn=lambda wildcards: '{outdir}/gene_clone_cn/{group}.tsv'.format(
+            outdir=os.path.join(config['outdir'], 'parse_cnv'),
+            group=get_sample_group(wildcards.sample)
+        ),
+        ## path to the sce_follicular_annotated_final_bc.rds file
+        sce='/path/sce_follicular_annotated_final_bc.rds',
+    output:
+        '{outdir}/clonealign_fit/{{sample}}.rds'.format(
+            outdir=output_dir
+        )
+    params:
+        name='run-clonealign-{sample}',
+        gex_var_quantile=config['clonealign']['gex_var_quantile'],
+        conda_env=config['conda_environment'],
+        conda_path=config['conda_path'],
+        sample='{sample}',
+        n_extra_genes=config['clonealign']['n_extra_genes'],
+        mean_counts=config['clonealign']['mean_counts_per_gene'],
+        clones_to_ignore=lambda wildcards: config['clonealign']['clones_to_ignore'][get_sample_group(wildcards.sample)],
+        max_copy_number=config['clonealign']['max_copy_number'],
+    log:
+        '{outdir}/run_clonealign/{{sample}}.log'.format(
+            outdir=log_dir
+        ),
+    shell:
+        'Rscript R/run_clonealign.R '
+        '--sce {input.sce} '
+        '--cnv {input.clone_cn} '
+        '--clone_prevs {input.clone_prevs} '
+        '--samples {params.sample} '
+        '--n_extra_genes {params.n_extra_genes} '
+        '--max_copy_number {params.max_copy_number} '
+        '--conda_env {params.conda_env} '
+        '--conda_path {params.conda_path} '
+        '--clones_to_ignore {params.clones_to_ignore} '
+        '--mean_counts {params.mean_counts} '
+        '--outfname {output} '
+        '>& {log}'

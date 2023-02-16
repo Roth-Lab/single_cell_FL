@@ -1,0 +1,169 @@
+outdir: /path/outputs
+scratchdir: /path/scratch
+logdir: /path/logs
+
+
+scrnaseq_data:
+  sce_library_id:
+    SA532X2XB00147: TENX065 
+    SA532X6XB00768: TENX066
+    SA532X10XB02956: TENX064
+    SA609X3XB01584: TENX063
+    # SA609X6XB01899: SCRNA10X_SA_CHIP0006_001
+    SA609X10XB02454: TENX062
+    # SA906_p30b: SCRNA10X_SA_CHIP0141_004
+    SA906_p50b: SCRNA10X_SA_CHIP0080_002
+    SA906_p15b: SCRNA10X_SA_CHIP0080_001
+    SA906_p11a: SCRNA10X_SA_CHIP0149_001
+    SA906_p57a: SCRNA10X_SA_CHIP0149_002
+    SA039_p23: SCRNA10X_SA_CHIP0142_001
+    SA039_p53: SCRNA10X_SA_CHIP0142_003
+
+dlp_data:
+  segments:
+    TFIRPAIR2:
+      - /data/TFIRPAIR2/segments.csv.gz
+    TFIRPAIR3:
+      - /data/TFIRPAIR3/segments.csv.gz
+    TFIRPAIR4:
+      - /data/TFIRPAIR4/segments.csv.gz
+    TFIRPAIR5:
+      - /data/TFIRPAIR5/segments.csv.gz
+    TFIRPAIR6:
+      - /data/TFIRPAIR6/segments.csv.gz
+    TFIRPAIR8:
+      - /data/TFIRPAIR8/segments.csv.gz
+    TFIRPAIR9:
+      - /data/TFIRPAIR9/segments.csv.gz
+    TFIRPAIR10:
+      - /data/TFIRPAIR10/segments.csv.gz
+    TFIRPAIR11:
+      - /data/TFIRPAIR11/segments.csv.gz
+    TFIRPAIR12:
+      - /data/TFIRPAIR12/segments.csv.gz
+    TFIRPAIR13:
+      - /data/TFIRPAIR13/segments.csv.gz
+  
+  clones:
+    TFIRPAIR2:
+      - /data/TFIRPAIR2/clones.csv
+    TFIRPAIR3:
+      - /data/TFIRPAIR3/clones.csv
+    TFIRPAIR4:
+      - /data/TFIRPAIR4/clones.csv
+    TFIRPAIR5:
+      - /data/TFIRPAIR5/clones.csv
+    TFIRPAIR6:
+      - /data/TFIRPAIR6/clones.csv
+    TFIRPAIR8:
+      - /data/TFIRPAIR8/clones.csv
+    TFIRPAIR9:
+      - /data/TFIRPAIR9/clones.csv
+    TFIRPAIR10:
+      - /data/TFIRPAIR10/clones.csv
+    TFIRPAIR11:
+      - /data/TFIRPAIR11/clones.csv
+    TFIRPAIR12:
+      - /data/TFIRPAIR12/clones.csv
+    TFIRPAIR13:
+      - /data/TFIRPAIR13/clones.csv
+
+metadata:
+  sample_metadata: ../../config/metadata/sample_metadata.yaml
+
+# Conda environment for python
+conda_path: /home/rstudio/miniconda/bin/conda
+conda_environment: r-tensorflow
+
+qc:
+  max_mito: 20
+  max_ribo: 60
+  min_features: 1000
+  nmads: 3
+  doublet_method: scrublet
+
+dimreduce:
+  umap_neighbors: 30
+  umap_min_dist: 0.5
+
+integrate:
+  TFIRPAIR2: none
+  TFIRPAIR3: none
+  TFIRPAIR4: none
+  TFIRPAIR5: none
+  TFIRPAIR6: none
+  TFIRPAIR8: none
+  TFIRPAIR9: none
+  TFIRPAIR10: none
+  TFIRPAIR11: none
+  TFIRPAIR12: none
+  TFIRPAIR13: none
+
+select_genes:
+  pct_pure: 0.6
+
+clonealign:
+  gex_var_quantile: 0.5
+  initial_shrink:
+    SA609: 0
+    SA532: 10
+    SA906b: 10
+    SA906a: 10
+    SA039: 10
+  n_extra_genes: 100
+  clones_to_ignore:
+    SA609: "None"
+    SA532: "A"
+    SA906b: "None"
+    SA906a: "None"
+    SA039: "A,B,C"
+    
+
+report:
+  low_qc_cluster:
+    SA609: "0"
+    SA532: "none"
+
+dimred_type: scanorama_TSNE
+
+differential_expression:
+  clones:
+    SA532X2XB00147:
+      - D
+      - B
+    SA532X6XB00768:
+      - A
+      - B
+    SA532X10XB02956:
+      - B
+      - C
+      - D
+    SA609X3XB01584:
+      - A
+      - B
+      - C_D
+    # SA609X6XB01899: SCRNA10X_SA_CHIP0006_001
+    SA609X10XB02454:
+      - E
+      - F_G
+      - I
+    # SA906_p30b: SCRNA10X_SA_CHIP0141_004
+    SA906_p50b:
+      - B_C
+      - D
+    SA906_p15b:
+      - F_H_I
+      - G
+    SA906_p11a:
+      - D_F_H_I
+      - C
+    SA906_p57a:
+      - B
+      - D_F_H_I
+      - A
+    SA039_p23:
+      - A
+      - B
+    SA039_p53:
+      - E
+      - D

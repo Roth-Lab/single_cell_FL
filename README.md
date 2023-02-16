@@ -22,7 +22,7 @@
 ## Code structure
 1. Data preprocessing: 10x BCL files was processed with [Cellranger](https://support.10xgenomics.com/single-cell-gene-expression/software/pipelines/latest/what-is-cell-ranger) (v3.0.2) and then processed with the Snakefile pipeline to generate a filtered, normalized, batch-corrected SingleCellExperiment object (and monocle3 CellDataSet object) with cell cycle annotations. BCR data was processed with [Cellranger vdj](https://support.10xgenomics.com/single-cell-vdj/software/pipelines/latest/using/vdj) to generate clonotype information. DLP data was processed with [single cell pipeline](https://single-cell-pipeline.readthedocs.io/en/latest/) to generate phylogenetic trees and clones.
 2. Differential expression: DE was also performed with the Snakefile pipeline.
-3. [Clonealign](https://genomebiology.biomedcentral.com/articles/10.1186/s13059-019-1645-z): Clonealign was performed using the scripts in clonealign folder.
+3. [Clonealign](https://genomebiology.biomedcentral.com/articles/10.1186/s13059-019-1645-z): For each patient, clonealign was performed using the 10x data (malignant B cells only) and the clone profiles from the DLP data (run parse_cnv pipeline then align_clones pipeline in clonealign folder).
 4. IHC: analysis was performed using the scripts in IHC_analysis folder.
 5. Survival: analysis was performed using the survival.R script.
 

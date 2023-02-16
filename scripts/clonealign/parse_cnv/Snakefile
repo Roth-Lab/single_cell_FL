@@ -1,0 +1,146 @@
+configfile: "../config/v1.yaml"
+
+workflow_name = 'parse_cnv'
+output_dir = os.path.join(config['outdir'], workflow_name)
+log_dir = os.path.join(config['logdir'], workflow_name)
+
+
+def list_segment_files(wildcards):
+    segment_files = [
+        config['dlp_data']['segments'][x] 
+        for x in config['integrate']['groups'][wildcards.group] 
+    ]
+    
+    return list(chain(*segment_files))
+
+def list_clone_files(wildcards):
+    clone_files = [
+        config['dlp_data']['clones'][x] 
+        for x in config['integrate']['groups'][wildcards.group] 
+    ]
+    
+    return list(chain(*clone_files))
+
+
+rule all:
+    # All the output files
+    input:
+        tsv='{outdir}/gene_clone_cn/{{group}}.tsv'.format(
+            outdir=output_dir
+        ),
+        fig='{outdir}/purity_figures/{{group}}.png'.format(
+            outdir=output_dir
+        ),
+        '{outdir}/clone_prevalences/{{group}}.csv'.format(
+            outdir=output_dir
+        )
+
+# add copy number information to segment file
+rule add_cn_seg:
+    input:
+        segment_files=list_segment_files,
+        clone_files=list_clone_files,
+    output:
+        '{outdir}/gene_cell_cn/{{group}}_cn.csv'.format(
+            outdir=output_dir
+        )
+    params:
+        name='gene-cell-cn-{group}',
+    log:
+        '{outdir}/compute_gene_cell_cn/{{group}}.log'.format(
+            outdir=log_dir
+        ),
+    benchmark:
+        '{outdir}/compute_gene_cell_cn/{{group}}.txt'.format(
+            outdir=log_dir
+        ),
+    shell:
+        'Rscript R/add_cn2seg.R '
+        '--segment_file {input.segment_files} '
+        '--clone_file {input.clone_files} '
+        '--outfname {output} '
+        '>& {log}'
+
+
+rule compute_gene_cell_cn:
+    input:
+        '{outdir}/gene_cell_cn/{{group}}_cn.csv'.format(
+            outdir=output_dir
+        )
+    output:
+        '{outdir}/gene_cell_cn/{{group}}.feather'.format(
+            outdir=output_dir
+        )
+    params:
+        name='gene-cell-cn-{group}',
+    log:
+        '{outdir}/compute_gene_cell_cn/{{group}}.log'.format(
+            outdir=log_dir
+        ),
+    benchmark:
+        '{outdir}/compute_gene_cell_cn/{{group}}.txt'.format(
+            outdir=log_dir
+        ),
+    shell:
+        'Rscript R/format_segments.R '
+        '--segment_file {input.segment_files} '
+        '--outfname {output} '
+        '>& {log}'
+
+# select genes
+rule select_genes:
+    input:
+        '{outdir}/gene_cell_cn/{{group}}.feather'.format(
+            outdir=output_dir
+        )
+    output:
+        tsv='{outdir}/gene_clone_cn/{{group}}.tsv'.format(
+            outdir=output_dir
+        ),
+        fig='{outdir}/purity_figures/{{group}}.png'.format(
+            outdir=output_dir
+        ),
+    params:
+        name='select-genes-{group}',
+        pct_pure=config['select_genes']['pct_pure'],
+    log:
+        '{outdir}/select_genes/{{group}}.log'.format(
+            outdir=log_dir
+        ),
+    benchmark:
+        '{outdir}/select_genes/{{group}}.txt'.format(
+            outdir=log_dir
+        ),
+    shell:
+        'Rscript R/select_genes-same-timepoint.R '
+        '--gene_cn {input} '
+        '--pct_pure {params.pct_pure} '
+        '--outfname {output.tsv} '
+        '--outfig {output.fig} '
+        '>& {log}'
+
+# compute clone prevalences
+rule compute_clone_prevalences:
+    input:
+        '{outdir}/gene_cell_cn/{{group}}_cn.csv'.format(
+            outdir=output_dir
+        )
+    output:
+        '{outdir}/clone_prevalences/{{group}}.csv'.format(
+            outdir=output_dir
+        )
+    params:
+        name='compute-clone-prevalences-{group}',
+    log:
+        '{outdir}/compute_clone_prevalences/{{group}}.log'.format(
+            outdir=log_dir
+        ),
+    benchmark:
+        '{outdir}/compute_clone_prevalences/{{group}}.txt'.format(
+            outdir=log_dir
+        ),
+    shell:
+        'Rscript R/compute_clone_prevalences.R '
+        '--segment_file {input.segment_files} '
+        '--outfname {output} '
+        '>& {log}'

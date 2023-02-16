@@ -1,0 +1,3 @@
+KeyError in line 4 of /Users/shaochwu/Desktop/github_master/fitness-scrna-master/pipelines/align_clones/Snakefile:
+'outdir'
+  File "/Users/shaochwu/Desktop/github_master/fitness-scrna-master/pipelines/align_clones/Snakefile", line 4, in <module>
