@@ -1,0 +1,890 @@
+---
+date: '`r format(Sys.Date(), "%B %d, %Y")`'
+output: html_document
+title: 'Phenotype spatial distribution: Tumor cells to Targeted TME cells'
+---
+
+```{r parameters, echo=FALSE,include=FALSE,message=FALSE,results="asis"}
+knitr::opts_chunk$set(echo=FALSE,fig.width=12, fig.height=8, comment=NA, warning=FALSE, message=FALSE)
+```
+
+```{r}
+# This document creates a spatial distribution report for two phenotypes in a single frame
+# with optional positivity thresholds for each phenotype.
+# It requires a cell seg table with phenotypes
+# Optionally, a tissue segmentation map image, if provided it will be used as a background for the image plots.
+library(DescTools)
+library(plyr)
+library(dplyr)
+library(pander)
+library(ggpubr)
+library(reshape2)
+source('./DistanceFunctions.r', local = TRUE)
+
+panel = "IHC_CD70-CD27_panel"
+working.dir <- "/path/imaging_data/"
+sample.data <- read.delim(paste0(working.dir, "core_info_",panel,".txt"), stringsAsFactors = FALSE)
+#sample.data <- filter(sample.data, Core_ID != "", Study_ID != "")
+sample.data <- filter(sample.data, timepoint %in% c('cont','FL','DLBCL'))
+
+# dlbcl.data <- read.delim(paste0(working.dir, "data/DLC380_MHC_annotations.txt"), stringsAsFactors = FALSE)
+# dlbcl.data <- mutate(dlbcl.data, Study_ID = gsub("^DLC", "DLC_", DLC_ID))
+# fl.data <- read.delim(paste0(working.dir, "data/FL_transform_information.txt"), stringsAsFactors = FALSE)
+# colnames(fl.data)[match("CODE_TRANSF", colnames(fl.data))] <- "Transformation_code"
+# fl.data$Transformation_code <- as.character(fl.data$Transformation_code)
+# sample.data <- merge(sample.data, dlbcl.data, by = "Study_ID", all.x = TRUE, all.y = FALSE)
+# sample.data <- merge(sample.data, fl.data, by.x = "Study_ID", by.y = "DASL_ID", all.x = TRUE, all.y = FALSE)
+
+plot.dir <- paste0(working.dir, "plots/")
+dir.create(plot.dir, showWarnings = FALSE, recursive = TRUE)
+
+# Set up comparisons to be made
+# Notice: choose one comparison list as needed
+comparisons1 <- list(
+	"CD70-CD20+ to CD27-LAG3+CD4-CD8+" = list(
+		phenotype1 = 'CD20+', phenotype1PosMarkers = c("CD20"), phenotype1NegMarkers = c("CD4","CD8",'CD70'),#as.character(NA),
+		phenotype1Category = as.character(NA), phenotype1ExpressionName = as.character(NA),
+		phenotype1ExpressionThreshold = 0.0, phenotype1Nickname = 'Tumor', phenotype1Color = 'red',
+		phenotype2 = 'CD27-LAG3+CD8+CD20-CD4-', phenotype2PosMarkers = c("LAG3", "CD8"), phenotype2NegMarkers = c("CD20",'CD4','CD27'),
+		phenotype2Category = as.character(NA), phenotype2ExpressionName = as.character(NA),
+		phenotype2ExpressionThreshold = 0, phenotype2Nickname = 'CD27-LAG3+CD8+CD4-', phenotype2Color = 'blue'),
+	"CD70+CD20+ to CD27+CD4+CD8-" = list(
+		phenotype1 = 'CD70+CD20+', phenotype1PosMarkers = c("CD20",'CD70'), phenotype1NegMarkers = c("CD4","CD8"),#as.character(NA),
+		phenotype1Category = as.character(NA), phenotype1ExpressionName = as.character(NA),
+		phenotype1ExpressionThreshold = 0.0, phenotype1Nickname = 'Tumor', phenotype1Color = 'red',
+		phenotype2 = 'CD4+CD27+CD20-CD8-', phenotype2PosMarkers = c("CD4", "CD27"), phenotype2NegMarkers = c("CD20",'CD8'),
+		phenotype2Category = as.character(NA), phenotype2ExpressionName = as.character(NA),
+		phenotype2ExpressionThreshold = 0, phenotype2Nickname = 'CD4+CD27+CD8-', phenotype2Color = 'blue'),
+	"CD70+CD20+ to CD27+CD4-CD8+" = list(
+		phenotype1 = 'CD70+CD20+', phenotype1PosMarkers = c("CD20",'CD70'), phenotype1NegMarkers = c("CD4","CD8"),#as.character(NA),
+		phenotype1Category = as.character(NA), phenotype1ExpressionName = as.character(NA),
+		phenotype1ExpressionThreshold = 0.0, phenotype1Nickname = 'Tumor', phenotype1Color = 'red',
+		phenotype2 = 'CD4-CD27+CD20-CD8+', phenotype2PosMarkers = c("CD8", "CD27"), phenotype2NegMarkers = c("CD20",'CD4'),
+		phenotype2Category = as.character(NA), phenotype2ExpressionName = as.character(NA),
+		phenotype2ExpressionThreshold = 0, phenotype2Nickname = 'CD4-CD27+CD8+', phenotype2Color = 'blue'),
+	"CD70+CD20+ to CD27+LAG3+CD4-CD8+" = list(
+		phenotype1 = 'CD70+CD20+', phenotype1PosMarkers = c("CD20",'CD70'), phenotype1NegMarkers = c("CD4","CD8"),#as.character(NA),
+		phenotype1Category = as.character(NA), phenotype1ExpressionName = as.character(NA),
+		phenotype1ExpressionThreshold = 0.0, phenotype1Nickname = 'Tumor', phenotype1Color = 'red',
+		phenotype2 = 'CD4-CD27+CD20-LAG3+CD8+', phenotype2PosMarkers = c("CD8", "CD27","LAG3"), phenotype2NegMarkers = c("CD20",'CD4'),
+		phenotype2Category = as.character(NA), phenotype2ExpressionName = as.character(NA),
+		phenotype2ExpressionThreshold = 0, phenotype2Nickname = 'CD4-CD27+LAG3+CD8+', phenotype2Color = 'blue'),
+	"CD70+CD20+ to CD27-LAG3+CD4-CD8+" = list(
+		phenotype1 = 'CD70+CD20+', phenotype1PosMarkers = c("CD20",'CD70'), phenotype1NegMarkers = c("CD4","CD8"),#as.character(NA),
+		phenotype1Category = as.character(NA), phenotype1ExpressionName = as.character(NA),
+		phenotype1ExpressionThreshold = 0.0, phenotype1Nickname = 'Tumor', phenotype1Color = 'red',
+		phenotype2 = 'CD27-CD20-LAG3+CD4-CD8+', phenotype2PosMarkers = c("CD8","LAG3"), phenotype2NegMarkers = c("CD20",'CD4','CD27'),
+		phenotype2Category = as.character(NA), phenotype2ExpressionName = as.character(NA),
+		phenotype2ExpressionThreshold = 0, phenotype2Nickname = 'CD4-CD27-LAG3+CD8+', phenotype2Color = 'blue'),
+	"CD70+CD20+ to CD27+LAG3+CD4+CD8-" = list(
+		phenotype1 = 'CD70+CD20+', phenotype1PosMarkers = c("CD20",'CD70'), phenotype1NegMarkers = c("CD4","CD8"),#as.character(NA),
+		phenotype1Category = as.character(NA), phenotype1ExpressionName = as.character(NA),
+		phenotype1ExpressionThreshold = 0.0, phenotype1Nickname = 'Tumor', phenotype1Color = 'red',
+		phenotype2 = 'CD4+CD27+CD20-LAG3+CD8-', phenotype2PosMarkers = c("CD4", "CD27",'LAG3'), phenotype2NegMarkers = c("CD20",'CD8'),
+		phenotype2Category = as.character(NA), phenotype2ExpressionName = as.character(NA),
+		phenotype2ExpressionThreshold = 0, phenotype2Nickname = 'CD4+CD27+LAG3+CD8-', phenotype2Color = 'blue'),
+	"CD70+CD20+ to CD27+FoxP3+CD4+CD8-" = list(
+		phenotype1 = 'CD70+CD20+', phenotype1PosMarkers = c("CD20",'CD70'), phenotype1NegMarkers = c("CD4","CD8"),#as.character(NA),
+		phenotype1Category = as.character(NA), phenotype1ExpressionName = as.character(NA),
+		phenotype1ExpressionThreshold = 0.0, phenotype1Nickname = 'Tumor', phenotype1Color = 'red',
+		phenotype2 = 'CD4+CD27+CD20-FoxP3+CD8-', phenotype2PosMarkers = c("CD4", "CD27",'FoxP3'), phenotype2NegMarkers = c("CD20",'CD8'),
+		phenotype2Category = as.character(NA), phenotype2ExpressionName = as.character(NA),
+		phenotype2ExpressionThreshold = 0, phenotype2Nickname = 'CD4+CD27+FoxP3+CD8-', phenotype2Color = 'blue')
+) ###### CD70-CD27 panel
+
+### CD70-CD27 panel CD8+
+comparisons <- list(
+	"CD20+ to CD4-CD8+" = list(
+		phenotype1 = 'CD20+', phenotype1PosMarkers = c("CD20"), phenotype1NegMarkers = c("CD4","CD8"),#as.character(NA),
+		phenotype1Category = as.character(NA), phenotype1ExpressionName = as.character(NA),
+		phenotype1ExpressionThreshold = 0.0, phenotype1Nickname = 'Tumor', phenotype1Color = 'red',
+		phenotype2 = 'CD8+CD20-CD4-', phenotype2PosMarkers = c("CD8"), phenotype2NegMarkers = c("CD20",'CD4'),
+		phenotype2Category = as.character(NA), phenotype2ExpressionName = as.character(NA),
+		phenotype2ExpressionThreshold = 0, phenotype2Nickname = 'CD8+CD4-', phenotype2Color = 'blue'),
+	"CD20+ to CD4-CD8+LAG3+" = list(
+		phenotype1 = 'CD20+', phenotype1PosMarkers = c("CD20"), phenotype1NegMarkers = c("CD4","CD8"),#as.character(NA),
+		phenotype1Category = as.character(NA), phenotype1ExpressionName = as.character(NA),
+		phenotype1ExpressionThreshold = 0.0, phenotype1Nickname = 'Tumor', phenotype1Color = 'red',
+		phenotype2 = 'LAG3+CD8+CD20-CD4-', phenotype2PosMarkers = c("CD8",'LAG3'), phenotype2NegMarkers = c("CD20",'CD4'),
+		phenotype2Category = as.character(NA), phenotype2ExpressionName = as.character(NA),
+		phenotype2ExpressionThreshold = 0, phenotype2Nickname = 'LAG3+CD8+CD4-', phenotype2Color = 'blue'),
+	"CD70+CD20+ to CD4-CD8+LAG3+CD27+" = list(
+		phenotype1 = 'CD70+CD20+', phenotype1PosMarkers = c('CD70',"CD20"), phenotype1NegMarkers = c("CD4","CD8"),#as.character(NA),
+		phenotype1Category = as.character(NA), phenotype1ExpressionName = as.character(NA),
+		phenotype1ExpressionThreshold = 0.0, phenotype1Nickname = 'Tumor', phenotype1Color = 'red',
+		phenotype2 = 'CD27+LAG3+CD8+CD20-CD4-', phenotype2PosMarkers = c("CD8",'LAG3','CD27'), phenotype2NegMarkers = c("CD20",'CD4'),
+		phenotype2Category = as.character(NA), phenotype2ExpressionName = as.character(NA),
+		phenotype2ExpressionThreshold = 0, phenotype2Nickname = 'CD27+LAG3+CD8+CD4-', phenotype2Color = 'blue'),
+	"CD70-CD20+ to CD4-CD8+LAG3+CD27-" = list(
+		phenotype1 = 'CD70-CD20+', phenotype1PosMarkers = c("CD20"), phenotype1NegMarkers = c("CD4","CD8",'CD70'),#as.character(NA),
+		phenotype1Category = as.character(NA), phenotype1ExpressionName = as.character(NA),
+		phenotype1ExpressionThreshold = 0.0, phenotype1Nickname = 'Tumor', phenotype1Color = 'red',
+		phenotype2 = 'CD27-LAG3+CD8+CD20-CD4-', phenotype2PosMarkers = c("CD8",'LAG3'), phenotype2NegMarkers = c("CD20",'CD4','CD27'),
+		phenotype2Category = as.character(NA), phenotype2ExpressionName = as.character(NA),
+		phenotype2ExpressionThreshold = 0, phenotype2Nickname = 'CD27-LAG3+CD8+CD4-', phenotype2Color = 'blue'),
+	"CD20+ to CD4-CD8+LAG3+CD27-" = list(
+		phenotype1 = 'CD20+', phenotype1PosMarkers = c("CD20"), phenotype1NegMarkers = c("CD4","CD8"),#as.character(NA),
+		phenotype1Category = as.character(NA), phenotype1ExpressionName = as.character(NA),
+		phenotype1ExpressionThreshold = 0.0, phenotype1Nickname = 'Tumor', phenotype1Color = 'red',
+		phenotype2 = 'CD27-LAG3+CD8+CD20-CD4-', phenotype2PosMarkers = c("CD8",'LAG3'), phenotype2NegMarkers = c("CD20",'CD4','CD27'),
+		phenotype2Category = as.character(NA), phenotype2ExpressionName = as.character(NA),
+		phenotype2ExpressionThreshold = 0, phenotype2Nickname = 'CD27-LAG3+CD8+CD4-', phenotype2Color = 'blue'),
+	"CD20+ to CD4-CD8+LAG3+CD27+" = list(
+		phenotype1 = 'CD20+', phenotype1PosMarkers = c("CD20"), phenotype1NegMarkers = c("CD4","CD8"),#as.character(NA),
+		phenotype1Category = as.character(NA), phenotype1ExpressionName = as.character(NA),
+		phenotype1ExpressionThreshold = 0.0, phenotype1Nickname = 'Tumor', phenotype1Color = 'red',
+		phenotype2 = 'CD27+LAG3+CD8+CD20-CD4-', phenotype2PosMarkers = c("CD8",'LAG3','CD27'), phenotype2NegMarkers = c("CD20",'CD4'),
+		phenotype2Category = as.character(NA), phenotype2ExpressionName = as.character(NA),
+		phenotype2ExpressionThreshold = 0, phenotype2Nickname = 'CD27+LAG3+CD8+CD4-', phenotype2Color = 'blue')
+	
+	)
+
+### CD70-CD27 panel CD4+
+comparisons1 <- list(
+	"CD20+ to CD4+CD8-" = list(
+		phenotype1 = 'CD20+', phenotype1PosMarkers = c("CD20"), phenotype1NegMarkers = c("CD4","CD8"),#as.character(NA),
+		phenotype1Category = as.character(NA), phenotype1ExpressionName = as.character(NA),
+		phenotype1ExpressionThreshold = 0.0, phenotype1Nickname = 'Tumor', phenotype1Color = 'red',
+		phenotype2 = 'CD4+CD20-CD8-', phenotype2PosMarkers = c("CD4"), phenotype2NegMarkers = c("CD20",'CD8'),
+		phenotype2Category = as.character(NA), phenotype2ExpressionName = as.character(NA),
+		phenotype2ExpressionThreshold = 0, phenotype2Nickname = 'CD8-CD4+', phenotype2Color = 'blue'),
+	"CD20+ to CD4+CD8-LAG3+" = list(
+		phenotype1 = 'CD20+', phenotype1PosMarkers = c("CD20"), phenotype1NegMarkers = c("CD4","CD8"),#as.character(NA),
+		phenotype1Category = as.character(NA), phenotype1ExpressionName = as.character(NA),
+		phenotype1ExpressionThreshold = 0.0, phenotype1Nickname = 'Tumor', phenotype1Color = 'red',
+		phenotype2 = 'LAG3+CD8-CD20-CD4+', phenotype2PosMarkers = c("CD4",'LAG3'), phenotype2NegMarkers = c("CD20",'CD8'),
+		phenotype2Category = as.character(NA), phenotype2ExpressionName = as.character(NA),
+		phenotype2ExpressionThreshold = 0, phenotype2Nickname = 'LAG3+CD8-CD4+', phenotype2Color = 'blue'),
+	"CD20+ to CD4+CD8-FoxP3+" = list(
+		phenotype1 = 'CD20+', phenotype1PosMarkers = c("CD20"), phenotype1NegMarkers = c("CD4","CD8"),#as.character(NA),
+		phenotype1Category = as.character(NA), phenotype1ExpressionName = as.character(NA),
+		phenotype1ExpressionThreshold = 0.0, phenotype1Nickname = 'Tumor', phenotype1Color = 'red',
+		phenotype2 = 'FoxP3+CD8-CD20-CD4+', phenotype2PosMarkers = c("CD4",'FoxP3'), phenotype2NegMarkers = c("CD20",'CD8'),
+		phenotype2Category = as.character(NA), phenotype2ExpressionName = as.character(NA),
+		phenotype2ExpressionThreshold = 0, phenotype2Nickname = 'FoxP3+CD8-CD4+', phenotype2Color = 'blue'),
+	"CD70+CD20+ to CD4+CD8-LAG3+CD27+" = list(
+		phenotype1 = 'CD70+CD20+', phenotype1PosMarkers = c('CD70',"CD20"), phenotype1NegMarkers = c("CD4","CD8"),#as.character(NA),
+		phenotype1Category = as.character(NA), phenotype1ExpressionName = as.character(NA),
+		phenotype1ExpressionThreshold = 0.0, phenotype1Nickname = 'Tumor', phenotype1Color = 'red',
+		phenotype2 = 'CD27+LAG3+CD8-CD20-CD4+', phenotype2PosMarkers = c("CD4",'LAG3','CD27'), phenotype2NegMarkers = c("CD20",'CD8'),
+		phenotype2Category = as.character(NA), phenotype2ExpressionName = as.character(NA),
+		phenotype2ExpressionThreshold = 0, phenotype2Nickname = 'CD27+LAG3+CD8-CD4+', phenotype2Color = 'blue'),
+	"CD70-CD20+ to CD4+CD8-LAG3+CD27-" = list(
+		phenotype1 = 'CD70-CD20+', phenotype1PosMarkers = c("CD20"), phenotype1NegMarkers = c("CD4","CD8",'CD70'),#as.character(NA),
+		phenotype1Category = as.character(NA), phenotype1ExpressionName = as.character(NA),
+		phenotype1ExpressionThreshold = 0.0, phenotype1Nickname = 'Tumor', phenotype1Color = 'red',
+		phenotype2 = 'CD27-LAG3+CD8-CD20-CD4+', phenotype2PosMarkers = c("CD4",'LAG3'), phenotype2NegMarkers = c("CD20",'CD8','CD27'),
+		phenotype2Category = as.character(NA), phenotype2ExpressionName = as.character(NA),
+		phenotype2ExpressionThreshold = 0, phenotype2Nickname = 'CD27-LAG3+CD8-CD4+', phenotype2Color = 'blue'),
+	"CD70+CD20+ to CD4+CD8-FoxP3+CD27+" = list(
+		phenotype1 = 'CD70+CD20+', phenotype1PosMarkers = c('CD70',"CD20"), phenotype1NegMarkers = c("CD4","CD8"),#as.character(NA),
+		phenotype1Category = as.character(NA), phenotype1ExpressionName = as.character(NA),
+		phenotype1ExpressionThreshold = 0.0, phenotype1Nickname = 'Tumor', phenotype1Color = 'red',
+		phenotype2 = 'CD27+FoxP3+CD8-CD20-CD4+', phenotype2PosMarkers = c("CD4",'FoxP3','CD27'), phenotype2NegMarkers = c("CD20",'CD8'),
+		phenotype2Category = as.character(NA), phenotype2ExpressionName = as.character(NA),
+		phenotype2ExpressionThreshold = 0, phenotype2Nickname = 'CD27+FoxP3+CD8-CD4+', phenotype2Color = 'blue'),
+	"CD70-CD20+ to CD4+CD8-FoxP3+CD27-" = list(
+		phenotype1 = 'CD70-CD20+', phenotype1PosMarkers = c("CD20"), phenotype1NegMarkers = c("CD4","CD8",'CD70'),#as.character(NA),
+		phenotype1Category = as.character(NA), phenotype1ExpressionName = as.character(NA),
+		phenotype1ExpressionThreshold = 0.0, phenotype1Nickname = 'Tumor', phenotype1Color = 'red',
+		phenotype2 = 'CD27-FoxP3+CD8-CD20-CD4+', phenotype2PosMarkers = c("CD4",'FoxP3'), phenotype2NegMarkers = c("CD20",'CD8','CD27'),
+		phenotype2Category = as.character(NA), phenotype2ExpressionName = as.character(NA),
+		phenotype2ExpressionThreshold = 0, phenotype2Nickname = 'CD27-FoxP3+CD8-CD4+', phenotype2Color = 'blue')
+	
+	)
+
+# CD10-CD20 panel 1 CD4+
+comparisons1 <- list(
+	"CD20+ to CD4+CD8-" = list(
+		phenotype1 = 'CD20+', phenotype1PosMarkers = c("CD20"), phenotype1NegMarkers = c("CD4","CD8"),#as.character(NA),
+		phenotype1Category = as.character(NA), phenotype1ExpressionName = as.character(NA),
+		phenotype1ExpressionThreshold = 0.0, phenotype1Nickname = 'Tumor', phenotype1Color = 'red',
+		phenotype2 = 'CD4+CD8-CD20-', phenotype2PosMarkers = c("CD4"), phenotype2NegMarkers = c("CD20",'CD8'),
+		phenotype2Category = as.character(NA), phenotype2ExpressionName = as.character(NA),
+		phenotype2ExpressionThreshold = 0, phenotype2Nickname = 'CD4+CD8-', phenotype2Color = 'blue'),
+	"CD20+ to CD4+CD8-PD1+" = list(
+		phenotype1 = 'CD20+', phenotype1PosMarkers = c("CD20"), phenotype1NegMarkers = c("CD4","CD8"),#as.character(NA),
+		phenotype1Category = as.character(NA), phenotype1ExpressionName = as.character(NA),
+		phenotype1ExpressionThreshold = 0.0, phenotype1Nickname = 'Tumor', phenotype1Color = 'red',
+		phenotype2 = 'PD1+CD4+CD20-CD8-', phenotype2PosMarkers = c("PD1","CD4"), phenotype2NegMarkers = c("CD20",'CD8'),
+		phenotype2Category = as.character(NA), phenotype2ExpressionName = as.character(NA),
+		phenotype2ExpressionThreshold = 0, phenotype2Nickname = 'PD1+CD4+CD8-', phenotype2Color = 'blue'),
+	"CD20+ to CD4+CD8-FoxP3+" = list(
+		phenotype1 = 'CD20+', phenotype1PosMarkers = c("CD20"), phenotype1NegMarkers = c("CD4","CD8"),#as.character(NA),
+		phenotype1Category = as.character(NA), phenotype1ExpressionName = as.character(NA),
+		phenotype1ExpressionThreshold = 0.0, phenotype1Nickname = 'Tumor', phenotype1Color = 'red',
+		phenotype2 = 'FoxP3+CD4+CD20-CD8-', phenotype2PosMarkers = c("FoxP3","CD4"), phenotype2NegMarkers = c("CD20",'CD8'),
+		phenotype2Category = as.character(NA), phenotype2ExpressionName = as.character(NA),
+		phenotype2ExpressionThreshold = 0, phenotype2Nickname = 'FoxP3+CD4+CD8-', phenotype2Color = 'blue'),
+	"CD20+ to CD4+CD8-FoxP3+PD1+" = list(
+		phenotype1 = 'CD20+', phenotype1PosMarkers = c("CD20"), phenotype1NegMarkers = c("CD4","CD8"),#as.character(NA),
+		phenotype1Category = as.character(NA), phenotype1ExpressionName = as.character(NA),
+		phenotype1ExpressionThreshold = 0.0, phenotype1Nickname = 'Tumor', phenotype1Color = 'red',
+		phenotype2 = 'FoxP3+PD1+CD8-CD20-CD4+', phenotype2PosMarkers = c("FoxP3","CD4",'PD1'), phenotype2NegMarkers = c("CD20",'CD8'),
+		phenotype2Category = as.character(NA), phenotype2ExpressionName = as.character(NA),
+		phenotype2ExpressionThreshold = 0, phenotype2Nickname = 'FoxP3+PD1+CD8-CD4+', phenotype2Color = 'blue'),
+	"CD20+ to CD4+CD8-FoxP3+PD1-" = list(
+		phenotype1 = 'CD20+', phenotype1PosMarkers = c("CD20"), phenotype1NegMarkers = c("CD4","CD8"),#as.character(NA),
+		phenotype1Category = as.character(NA), phenotype1ExpressionName = as.character(NA),
+		phenotype1ExpressionThreshold = 0.0, phenotype1Nickname = 'Tumor', phenotype1Color = 'red',
+		phenotype2 = 'FoxP3+PD1-CD8-CD20-CD4+', phenotype2PosMarkers = c("FoxP3","CD4"), phenotype2NegMarkers = c("CD20",'CD8','PD1'),
+		phenotype2Category = as.character(NA), phenotype2ExpressionName = as.character(NA),
+		phenotype2ExpressionThreshold = 0, phenotype2Nickname = 'FoxP3+PD1-CD8-CD4+', phenotype2Color = 'blue'),
+	"CD20+ to CD4+CD8-LAG3+" = list(
+		phenotype1 = 'CD20+', phenotype1PosMarkers = c("CD20"), phenotype1NegMarkers = c("CD4","CD8"),#as.character(NA),
+		phenotype1Category = as.character(NA), phenotype1ExpressionName = as.character(NA),
+		phenotype1ExpressionThreshold = 0.0, phenotype1Nickname = 'Tumor', phenotype1Color = 'red',
+		phenotype2 = 'LAG3+CD4+CD20-CD8-', phenotype2PosMarkers = c("LAG3","CD4"), phenotype2NegMarkers = c("CD20",'CD8'),
+		phenotype2Category = as.character(NA), phenotype2ExpressionName = as.character(NA),
+		phenotype2ExpressionThreshold = 0, phenotype2Nickname = 'LAG3+CD4+CD8-', phenotype2Color = 'blue'),
+	"CD20+ to CD4+CD8-LAG3+PD1+" = list(
+		phenotype1 = 'CD20+', phenotype1PosMarkers = c("CD20"), phenotype1NegMarkers = c("CD4","CD8"),#as.character(NA),
+		phenotype1Category = as.character(NA), phenotype1ExpressionName = as.character(NA),
+		phenotype1ExpressionThreshold = 0.0, phenotype1Nickname = 'Tumor', phenotype1Color = 'red',
+		phenotype2 = 'LAG3+PD1+CD8-CD20-CD4+', phenotype2PosMarkers = c("LAG3",'PD1',"CD4"), phenotype2NegMarkers = c("CD20",'CD8'),
+		phenotype2Category = as.character(NA), phenotype2ExpressionName = as.character(NA),
+		phenotype2ExpressionThreshold = 0, phenotype2Nickname = 'LAG3+PD1+CD8-CD4+', phenotype2Color = 'blue'),
+	"CD20+ to CD4+CD8-LAG3+PD1-" = list(
+		phenotype1 = 'CD20+', phenotype1PosMarkers = c("CD20"), phenotype1NegMarkers = c("CD4","CD8"),#as.character(NA),
+		phenotype1Category = as.character(NA), phenotype1ExpressionName = as.character(NA),
+		phenotype1ExpressionThreshold = 0.0, phenotype1Nickname = 'Tumor', phenotype1Color = 'red',
+		phenotype2 = 'LAG3+PD1-CD8-CD20-CD4+', phenotype2PosMarkers = c("LAG3","CD4"), phenotype2NegMarkers = c("CD20",'CD8','PD1'),
+		phenotype2Category = as.character(NA), phenotype2ExpressionName = as.character(NA),
+		phenotype2ExpressionThreshold = 0, phenotype2Nickname = 'LAG3+PD1-CD8-CD4+', phenotype2Color = 'blue'))
+
+# CD10-CD20 panel 2 CD8+
+comparisons1 <- list(
+	"CD20+ to CD4-CD8+" = list(
+		phenotype1 = 'CD20+', phenotype1PosMarkers = c("CD20"), phenotype1NegMarkers = c("CD4","CD8"),#as.character(NA),
+		phenotype1Category = as.character(NA), phenotype1ExpressionName = as.character(NA),
+		phenotype1ExpressionThreshold = 0.0, phenotype1Nickname = 'Tumor', phenotype1Color = 'red',
+		phenotype2 = 'CD4-CD8+CD20-', phenotype2PosMarkers = c("CD8"), phenotype2NegMarkers = c("CD20",'CD4'),
+		phenotype2Category = as.character(NA), phenotype2ExpressionName = as.character(NA),
+		phenotype2ExpressionThreshold = 0, phenotype2Nickname = 'CD4-CD8+', phenotype2Color = 'blue'),
+	"CD20+ to CD4-CD8+PD1+" = list(
+		phenotype1 = 'CD20+', phenotype1PosMarkers = c("CD20"), phenotype1NegMarkers = c("CD4","CD8"),#as.character(NA),
+		phenotype1Category = as.character(NA), phenotype1ExpressionName = as.character(NA),
+		phenotype1ExpressionThreshold = 0.0, phenotype1Nickname = 'Tumor', phenotype1Color = 'red',
+		phenotype2 = 'PD1+CD4-CD20-CD8+', phenotype2PosMarkers = c("PD1","CD8"), phenotype2NegMarkers = c("CD20",'CD4'),
+		phenotype2Category = as.character(NA), phenotype2ExpressionName = as.character(NA),
+		phenotype2ExpressionThreshold = 0, phenotype2Nickname = 'PD1+CD4-CD8+', phenotype2Color = 'blue'),
+	"CD20+ to CD4-CD8+LAG3+" = list(
+		phenotype1 = 'CD20+', phenotype1PosMarkers = c("CD20"), phenotype1NegMarkers = c("CD4","CD8"),#as.character(NA),
+		phenotype1Category = as.character(NA), phenotype1ExpressionName = as.character(NA),
+		phenotype1ExpressionThreshold = 0.0, phenotype1Nickname = 'Tumor', phenotype1Color = 'red',
+		phenotype2 = 'LAG3+CD4-CD20-CD8+', phenotype2PosMarkers = c("LAG3","CD8"), phenotype2NegMarkers = c("CD20",'CD4'),
+		phenotype2Category = as.character(NA), phenotype2ExpressionName = as.character(NA),
+		phenotype2ExpressionThreshold = 0, phenotype2Nickname = 'LAG3+CD4-CD8+', phenotype2Color = 'blue'),
+	"CD20+ to CD4-CD8+LAG3+PD1+" = list(
+		phenotype1 = 'CD20+', phenotype1PosMarkers = c("CD20"), phenotype1NegMarkers = c("CD4","CD8"),#as.character(NA),
+		phenotype1Category = as.character(NA), phenotype1ExpressionName = as.character(NA),
+		phenotype1ExpressionThreshold = 0.0, phenotype1Nickname = 'Tumor', phenotype1Color = 'red',
+		phenotype2 = 'LAG3+PD1+CD4-CD20-CD8+', phenotype2PosMarkers = c("LAG3","CD8",'PD1'), phenotype2NegMarkers = c("CD20",'CD4'),
+		phenotype2Category = as.character(NA), phenotype2ExpressionName = as.character(NA),
+		phenotype2ExpressionThreshold = 0, phenotype2Nickname = 'LAG3+PD1+CD4-CD8+', phenotype2Color = 'blue'),
+	"CD20+ to CD4-CD8+LAG3+PD1-" = list(
+		phenotype1 = 'CD20+', phenotype1PosMarkers = c("CD20"), phenotype1NegMarkers = c("CD4","CD8"),#as.character(NA),
+		phenotype1Category = as.character(NA), phenotype1ExpressionName = as.character(NA),
+		phenotype1ExpressionThreshold = 0.0, phenotype1Nickname = 'Tumor', phenotype1Color = 'red',
+		phenotype2 = 'LAG3+PD1-CD4-CD20-CD8+', phenotype2PosMarkers = c("LAG3","CD8"), phenotype2NegMarkers = c("CD20",'CD4','PD1'),
+		phenotype2Category = as.character(NA), phenotype2ExpressionName = as.character(NA),
+		phenotype2ExpressionThreshold = 0, phenotype2Nickname = 'LAG3+PD1-CD4-CD8+', phenotype2Color = 'blue')
+	)
+
+# TFH panel final
+comparisons1 <- list(
+  "CD20+ to CD4+PD1+" = list(
+		phenotype1 = 'CD20+', phenotype1PosMarkers = c("CD20"), phenotype1NegMarkers = c("CD4"),#as.character(NA),
+		phenotype1Category = as.character(NA), phenotype1ExpressionName = as.character(NA),
+		phenotype1ExpressionThreshold = 0.0, phenotype1Nickname = 'Tumor', phenotype1Color = 'red',
+		phenotype2 = 'CD4+PD1+', phenotype2PosMarkers = c("PD1","CD4"), phenotype2NegMarkers = c("CD20"),
+		phenotype2Category = as.character(NA), phenotype2ExpressionName = as.character(NA),
+		phenotype2ExpressionThreshold = 0, phenotype2Nickname = 'CD4+PD1+', phenotype2Color = 'blue'),
+	"CD20+ to CD4+BCL6+" = list(
+		phenotype1 = 'CD20+', phenotype1PosMarkers = c("CD20"), phenotype1NegMarkers = c("CD4"),#as.character(NA),
+		phenotype1Category = as.character(NA), phenotype1ExpressionName = as.character(NA),
+		phenotype1ExpressionThreshold = 0.0, phenotype1Nickname = 'Tumor', phenotype1Color = 'red',
+		phenotype2 = 'CD4+BCL6+', phenotype2PosMarkers = c("BCL6","CD4"), phenotype2NegMarkers = c("CD20"),
+		phenotype2Category = as.character(NA), phenotype2ExpressionName = as.character(NA),
+		phenotype2ExpressionThreshold = 0, phenotype2Nickname = 'CD4+BCL6+', phenotype2Color = 'blue'),
+	"CD20+ to CD4+BCL6+PD1+" = list(
+		phenotype1 = 'CD20+', phenotype1PosMarkers = c("CD20"), phenotype1NegMarkers = c("CD4"),#as.character(NA),
+		phenotype1Category = as.character(NA), phenotype1ExpressionName = as.character(NA),
+		phenotype1ExpressionThreshold = 0.0, phenotype1Nickname = 'Tumor', phenotype1Color = 'red',
+		phenotype2 = 'CD4+BCL6+PD1+', phenotype2PosMarkers = c("BCL6","CD4","PD1"), phenotype2NegMarkers = c("CD20"),
+		phenotype2Category = as.character(NA), phenotype2ExpressionName = as.character(NA),
+		phenotype2ExpressionThreshold = 0, phenotype2Nickname = 'CD4+BCL6+PD1+', phenotype2Color = 'blue'),
+	"CD20+ to CD4+CXCR5+PD1+" = list(
+		phenotype1 = 'CD20+', phenotype1PosMarkers = c("CD20"), phenotype1NegMarkers = c("CD4"),#as.character(NA),
+		phenotype1Category = as.character(NA), phenotype1ExpressionName = as.character(NA),
+		phenotype1ExpressionThreshold = 0.0, phenotype1Nickname = 'Tumor', phenotype1Color = 'red',
+		phenotype2 = 'CD4+CXCR5+PD1+', phenotype2PosMarkers = c("CXCR5","CD4",'PD1'), phenotype2NegMarkers = c("CD20"),
+		phenotype2Category = as.character(NA), phenotype2ExpressionName = as.character(NA),
+		phenotype2ExpressionThreshold = 0, phenotype2Nickname = 'CD4+CXCR5+PD1+', phenotype2Color = 'blue'),
+	"CD20+ to CD4+CXCR5+BCL6+PD1+" = list(
+		phenotype1 = 'CD20+', phenotype1PosMarkers = c("CD20"), phenotype1NegMarkers = c("CD4"),#as.character(NA),
+		phenotype1Category = as.character(NA), phenotype1ExpressionName = as.character(NA),
+		phenotype1ExpressionThreshold = 0.0, phenotype1Nickname = 'Tumor', phenotype1Color = 'red',
+		phenotype2 = 'CD4+CXCR5+BCL6+PD1+', phenotype2PosMarkers = c("CXCR5","CD4",'BCL6','PD1'), phenotype2NegMarkers = c("CD20"),
+		phenotype2Category = as.character(NA), phenotype2ExpressionName = as.character(NA),
+		phenotype2ExpressionThreshold = 0, phenotype2Nickname = 'CD4+CXCR5+BCL6+PD1+', phenotype2Color = 'blue')
+)
+
+# TFH new 6 combinations
+comparisons1 <- list(
+	"CD20+ to CD4+BCL6+" = list(
+		phenotype1 = 'CD20+', phenotype1PosMarkers = c("CD20"), phenotype1NegMarkers = c("CD4"),#as.character(NA),
+		phenotype1Category = as.character(NA), phenotype1ExpressionName = as.character(NA),
+		phenotype1ExpressionThreshold = 0.0, phenotype1Nickname = 'Tumor', phenotype1Color = 'red',
+		phenotype2 = 'CD4+BCL6+', phenotype2PosMarkers = c("BCL6","CD4"), phenotype2NegMarkers = c("CD20"),
+		phenotype2Category = as.character(NA), phenotype2ExpressionName = as.character(NA),
+		phenotype2ExpressionThreshold = 0, phenotype2Nickname = 'CD4+BCL6+', phenotype2Color = 'blue'),
+	"CD20+ to CD4+CXCR5+" = list(
+		phenotype1 = 'CD20+', phenotype1PosMarkers = c("CD20"), phenotype1NegMarkers = c("CD4"),#as.character(NA),
+		phenotype1Category = as.character(NA), phenotype1ExpressionName = as.character(NA),
+		phenotype1ExpressionThreshold = 0.0, phenotype1Nickname = 'Tumor', phenotype1Color = 'red',
+		phenotype2 = 'CD4+CXCR5+', phenotype2PosMarkers = c("CXCR5","CD4"), phenotype2NegMarkers = c("CD20"),
+		phenotype2Category = as.character(NA), phenotype2ExpressionName = as.character(NA),
+		phenotype2ExpressionThreshold = 0, phenotype2Nickname = 'CXCR5+CD4+', phenotype2Color = 'blue'),
+	"CD20+ to CD4+CXCR5+PD1+" = list(
+		phenotype1 = 'CD20+', phenotype1PosMarkers = c("CD20"), phenotype1NegMarkers = c("CD4"),#as.character(NA),
+		phenotype1Category = as.character(NA), phenotype1ExpressionName = as.character(NA),
+		phenotype1ExpressionThreshold = 0.0, phenotype1Nickname = 'Tumor', phenotype1Color = 'red',
+		phenotype2 = 'CD4+CXCR5+PD1+', phenotype2PosMarkers = c("CXCR5","CD4",'PD1'), phenotype2NegMarkers = c("CD20"),
+		phenotype2Category = as.character(NA), phenotype2ExpressionName = as.character(NA),
+		phenotype2ExpressionThreshold = 0, phenotype2Nickname = 'CD4+CXCR5+PD1+', phenotype2Color = 'blue'),
+	"CD20+ to CD4+CXCR5+BCL6+" = list(
+		phenotype1 = 'CD20+', phenotype1PosMarkers = c("CD20"), phenotype1NegMarkers = c("CD4"),#as.character(NA),
+		phenotype1Category = as.character(NA), phenotype1ExpressionName = as.character(NA),
+		phenotype1ExpressionThreshold = 0.0, phenotype1Nickname = 'Tumor', phenotype1Color = 'red',
+		phenotype2 = 'CD4+CXCR5+BCL6+', phenotype2PosMarkers = c("CXCR5","CD4",'BCL6'), phenotype2NegMarkers = c("CD20"),
+		phenotype2Category = as.character(NA), phenotype2ExpressionName = as.character(NA),
+		phenotype2ExpressionThreshold = 0, phenotype2Nickname = 'CD4+CXCR5+BCL6+', phenotype2Color = 'blue'),
+	"CD20+ to CD4+CXCR5+BCL6+PD1+" = list(
+		phenotype1 = 'CD20+', phenotype1PosMarkers = c("CD20"), phenotype1NegMarkers = c("CD4"),#as.character(NA),
+		phenotype1Category = as.character(NA), phenotype1ExpressionName = as.character(NA),
+		phenotype1ExpressionThreshold = 0.0, phenotype1Nickname = 'Tumor', phenotype1Color = 'red',
+		phenotype2 = 'CD4+CXCR5+BCL6+PD1+', phenotype2PosMarkers = c("CXCR5","CD4",'BCL6','PD1'), phenotype2NegMarkers = c("CD20"),
+		phenotype2Category = as.character(NA), phenotype2ExpressionName = as.character(NA),
+		phenotype2ExpressionThreshold = 0, phenotype2Nickname = 'CD4+CXCR5+BCL6+PD1+', phenotype2Color = 'blue'),
+	"CD20+ to CD4+CXCR5+BCL6+PD1+CXCL13+" = list(
+		phenotype1 = 'CD20+', phenotype1PosMarkers = c("CD20"), phenotype1NegMarkers = c("CD4"),#as.character(NA),
+		phenotype1Category = as.character(NA), phenotype1ExpressionName = as.character(NA),
+		phenotype1ExpressionThreshold = 0.0, phenotype1Nickname = 'Tumor', phenotype1Color = 'red',
+		phenotype2 = 'CD4+CXCR5+BCL6+PD1+CXCL13+', phenotype2PosMarkers = c("CXCR5","CD4",'BCL6','PD1','CXCL13'), phenotype2NegMarkers = c("CD20"),
+		phenotype2Category = as.character(NA), phenotype2ExpressionName = as.character(NA),
+		phenotype2ExpressionThreshold = 0, phenotype2Nickname = 'CD4+CXCR5+BCL6+PD1+CXCL13+', phenotype2Color = 'blue')
+	
+)
+
+# combined panel 1 CD4+
+comparisons1 <- list(
+	"CD20+ to CD4+CD8-" = list(
+		phenotype1 = 'CD20+', phenotype1PosMarkers = c("CD20"), phenotype1NegMarkers = c("CD4","CD8"),#as.character(NA),
+		phenotype1Category = as.character(NA), phenotype1ExpressionName = as.character(NA),
+		phenotype1ExpressionThreshold = 0.0, phenotype1Nickname = 'Tumor', phenotype1Color = 'red',
+		phenotype2 = 'CD4+CD8-CD20-', phenotype2PosMarkers = c("CD4"), phenotype2NegMarkers = c("CD20",'CD8'),
+		phenotype2Category = as.character(NA), phenotype2ExpressionName = as.character(NA),
+		phenotype2ExpressionThreshold = 0, phenotype2Nickname = 'CD4+CD8-', phenotype2Color = 'blue'),
+	"CD20+ to CD4+CD8-FoxP3+" = list(
+		phenotype1 = 'CD20+', phenotype1PosMarkers = c("CD20"), phenotype1NegMarkers = c("CD4","CD8"),#as.character(NA),
+		phenotype1Category = as.character(NA), phenotype1ExpressionName = as.character(NA),
+		phenotype1ExpressionThreshold = 0.0, phenotype1Nickname = 'Tumor', phenotype1Color = 'red',
+		phenotype2 = 'FoxP3+CD4+CD20-CD8-', phenotype2PosMarkers = c("FoxP3","CD4"), phenotype2NegMarkers = c("CD20",'CD8'),
+		phenotype2Category = as.character(NA), phenotype2ExpressionName = as.character(NA),
+		phenotype2ExpressionThreshold = 0, phenotype2Nickname = 'FoxP3+CD4+CD8-', phenotype2Color = 'blue'),
+	"CD20+ to CD4+CD8-LAG3+" = list(
+		phenotype1 = 'CD20+', phenotype1PosMarkers = c("CD20"), phenotype1NegMarkers = c("CD4","CD8"),#as.character(NA),
+		phenotype1Category = as.character(NA), phenotype1ExpressionName = as.character(NA),
+		phenotype1ExpressionThreshold = 0.0, phenotype1Nickname = 'Tumor', phenotype1Color = 'red',
+		phenotype2 = 'LAG3+CD4+CD20-CD8-', phenotype2PosMarkers = c("LAG3","CD4"), phenotype2NegMarkers = c("CD20",'CD8'),
+		phenotype2Category = as.character(NA), phenotype2ExpressionName = as.character(NA),
+		phenotype2ExpressionThreshold = 0, phenotype2Nickname = 'LAG3+CD4+CD8-', phenotype2Color = 'blue')
+)
+
+# combined panel 2 CD8+
+comparisons1 <- list(
+	"CD20+ to CD4-CD8+" = list(
+		phenotype1 = 'CD20+', phenotype1PosMarkers = c("CD20"), phenotype1NegMarkers = c("CD4","CD8"),#as.character(NA),
+		phenotype1Category = as.character(NA), phenotype1ExpressionName = as.character(NA),
+		phenotype1ExpressionThreshold = 0.0, phenotype1Nickname = 'Tumor', phenotype1Color = 'red',
+		phenotype2 = 'CD4-CD8+CD20-', phenotype2PosMarkers = c("CD8"), phenotype2NegMarkers = c("CD20",'CD4'),
+		phenotype2Category = as.character(NA), phenotype2ExpressionName = as.character(NA),
+		phenotype2ExpressionThreshold = 0, phenotype2Nickname = 'CD4-CD8+', phenotype2Color = 'blue'),
+	"CD20+ to CD4-CD8+LAG3+" = list(
+		phenotype1 = 'CD20+', phenotype1PosMarkers = c("CD20"), phenotype1NegMarkers = c("CD4","CD8"),#as.character(NA),
+		phenotype1Category = as.character(NA), phenotype1ExpressionName = as.character(NA),
+		phenotype1ExpressionThreshold = 0.0, phenotype1Nickname = 'Tumor', phenotype1Color = 'red',
+		phenotype2 = 'LAG3+CD4-CD20-CD8+', phenotype2PosMarkers = c("LAG3","CD8"), phenotype2NegMarkers = c("CD20",'CD4'),
+		phenotype2Category = as.character(NA), phenotype2ExpressionName = as.character(NA),
+		phenotype2ExpressionThreshold = 0, phenotype2Nickname = 'LAG3+CD4-CD8+', phenotype2Color = 'blue')
+)
+
+# combined panel 2 CD8+ with PD-1
+comparisons1 <- list(
+	"CD20+ to CD4-CD8+" = list(
+		phenotype1 = 'CD20+', phenotype1PosMarkers = c("CD20"), phenotype1NegMarkers = c("CD4","CD8"),#as.character(NA),
+		phenotype1Category = as.character(NA), phenotype1ExpressionName = as.character(NA),
+		phenotype1ExpressionThreshold = 0.0, phenotype1Nickname = 'Tumor', phenotype1Color = 'red',
+		phenotype2 = 'CD4-CD8+CD20-', phenotype2PosMarkers = c("CD8"), phenotype2NegMarkers = c("CD20",'CD4'),
+		phenotype2Category = as.character(NA), phenotype2ExpressionName = as.character(NA),
+		phenotype2ExpressionThreshold = 0, phenotype2Nickname = 'CD4-CD8+', phenotype2Color = 'blue'),
+	"CD20+ to CD4-CD8+PD-1+" = list(
+		phenotype1 = 'CD20+', phenotype1PosMarkers = c("CD20"), phenotype1NegMarkers = c("CD4","CD8"),#as.character(NA),
+		phenotype1Category = as.character(NA), phenotype1ExpressionName = as.character(NA),
+		phenotype1ExpressionThreshold = 0.0, phenotype1Nickname = 'Tumor', phenotype1Color = 'red',
+		phenotype2 = 'PD-1+CD4-CD20-CD8+', phenotype2PosMarkers = c("PD-1","CD8"), phenotype2NegMarkers = c("CD20",'CD4'),
+		phenotype2Category = as.character(NA), phenotype2ExpressionName = as.character(NA),
+		phenotype2ExpressionThreshold = 0, phenotype2Nickname = 'PD-1+CD4-CD8+', phenotype2Color = 'blue'),
+	"CD20+ to CD4-CD8+LAG3+" = list(
+		phenotype1 = 'CD20+', phenotype1PosMarkers = c("CD20"), phenotype1NegMarkers = c("CD4","CD8"),#as.character(NA),
+		phenotype1Category = as.character(NA), phenotype1ExpressionName = as.character(NA),
+		phenotype1ExpressionThreshold = 0.0, phenotype1Nickname = 'Tumor', phenotype1Color = 'red',
+		phenotype2 = 'LAG3+CD4-CD20-CD8+', phenotype2PosMarkers = c("LAG3","CD8"), phenotype2NegMarkers = c("CD20",'CD4'),
+		phenotype2Category = as.character(NA), phenotype2ExpressionName = as.character(NA),
+		phenotype2ExpressionThreshold = 0, phenotype2Nickname = 'LAG3+CD4-CD8+', phenotype2Color = 'blue'),
+	"CD20+ to CD4-CD8+LAG3+PD-1+" = list(
+		phenotype1 = 'CD20+', phenotype1PosMarkers = c("CD20"), phenotype1NegMarkers = c("CD4","CD8"),#as.character(NA),
+		phenotype1Category = as.character(NA), phenotype1ExpressionName = as.character(NA),
+		phenotype1ExpressionThreshold = 0.0, phenotype1Nickname = 'Tumor', phenotype1Color = 'red',
+		phenotype2 = 'LAG3+PD-1+CD4-CD20-CD8+', phenotype2PosMarkers = c("LAG3","CD8",'PD-1'), phenotype2NegMarkers = c("CD20",'CD4'),
+		phenotype2Category = as.character(NA), phenotype2ExpressionName = as.character(NA),
+		phenotype2ExpressionThreshold = 0, phenotype2Nickname = 'LAG3+PD-1+CD4-CD8+', phenotype2Color = 'blue'),
+	"CD20+ to CD4-CD8+LAG3+PD-1-" = list(
+		phenotype1 = 'CD20+', phenotype1PosMarkers = c("CD20"), phenotype1NegMarkers = c("CD4","CD8"),#as.character(NA),
+		phenotype1Category = as.character(NA), phenotype1ExpressionName = as.character(NA),
+		phenotype1ExpressionThreshold = 0.0, phenotype1Nickname = 'Tumor', phenotype1Color = 'red',
+		phenotype2 = 'LAG3+PD-1-CD4-CD20-CD8+', phenotype2PosMarkers = c("LAG3","CD8"), phenotype2NegMarkers = c("CD20",'CD4','PD-1'),
+		phenotype2Category = as.character(NA), phenotype2ExpressionName = as.character(NA),
+		phenotype2ExpressionThreshold = 0, phenotype2Nickname = 'LAG3+PD-1-CD4-CD8+', phenotype2Color = 'blue')
+	)
+
+
+# Markers to be evaluated (each one has been called individually by inForm)
+# Notice: choose one marker gene list as needed
+#markers <- c("CD4", "CD8", "CD20", "FoxP3", "LAG3", "PD1") # CD10-CD20_panel
+markers <- c('CD70','CD27','FoxP3','LAG3','CD4','CD8','CD20') # CD70-CD27 panel
+#markers <- c('CD20','CD10','CD4','CXCL13','CXCR5','PD1','BCL6') # TFH_panel
+#markers <- c("CD4", "CD8", "CD20", "FoxP3", "LAG3") # combined_panel
+
+#markers <- list.files(paste0(working.dir, '/', panel))
+
+# Read in merged marker data
+all.data <- fread(paste0(working.dir, "/", panel, "/", "merged_data/all_markers_merged.txt"))
+
+if (panel=="IHC_CD10-CD20_combined_panel") {
+  all.data=all.data[startsWith(all.data$Name,'Steidl'),]
+}
+
+# filter tissue region category
+#all.data=all.data[all.data$Tissue_Category=='CD20+',]
+
+# marker name parsing. Comment if not necessary
+if (panel=='IHC_TFH_panel') {
+  colnames(all.data)[12]='PD1'
+}
+
+if (panel=='IHC_CD10-CD20_combined_panel') {
+  colnames(all.data)[11]='PD1'
+}
+
+# Read in the results from all samples
+num_cells=NULL
+nn.all <- data.table()
+prop.all <- data.table()
+for (s in unique(all.data$Name)) {
+	print(paste0("Processing sample: ", s))
+	s.data <- filter(all.data, Name == s)
+
+	### modified markers ###
+  # used one chunk as needed
+	
+	# s.data=s.data %>% group_by(cell_label) %>%
+  #   dplyr::mutate(CD4=ifelse("POS" %in% CD4,'POS','Other'),
+  #          CD8=ifelse("POS" %in% CD8,'POS','Other'),
+  #          CD20=ifelse("POS" %in% CD20,'POS','Other'),
+  #          LAG3=ifelse("POS" %in% LAG3,'POS','Other'),
+  #          FoxP3=ifelse("POS" %in% FoxP3,'POS','Other'),
+  #          PD1=ifelse("POS" %in% PD1,'POS','Other')
+  #          #CD70=ifelse("POS" %in% CD70,'POS','Other'),
+  #          #CD27=ifelse("POS" %in% CD27,'POS','Other')
+  #   ) # CD10-CD20_panel
+	
+# 	s.data=s.data %>% group_by(cell_label) %>%
+#     dplyr::mutate(CD4=ifelse("POS" %in% CD4,'POS','Other'),
+#            CD10=ifelse("POS" %in% CD10,'POS','Other'),
+#            CD20=ifelse("POS" %in% CD20,'POS','Other'),
+#            PD1=ifelse("POS" %in% PD1,'POS','Other'),
+#            BCL6=ifelse("POS" %in% BCL6,'POS','Other'),
+#            CXCR5=ifelse("POS" %in% CXCR5,'POS','Other'),
+#            #CD70=ifelse("POS" %in% CD70,'POS','Other'),
+#            CXCL13=ifelse("POS" %in% CXCL13,'POS','Other')
+#     ) # TFH panel
+	
+  s.data=s.data %>% group_by(cell_label) %>%
+    dplyr::mutate(CD4=ifelse("POS" %in% CD4,'POS','Other'),
+           CD8=ifelse("POS" %in% CD8,'POS','Other'),
+           CD20=ifelse("POS" %in% CD20,'POS','Other'),
+           LAG3=ifelse("POS" %in% LAG3,'POS','Other'),
+           FoxP3=ifelse("POS" %in% FoxP3,'POS','Other'),
+           #PD1=ifelse("POS" %in% PD1,'POS','Other')
+           CD70=ifelse("POS" %in% CD70,'POS','Other'),
+           CD27=ifelse("POS" %in% CD27,'POS','Other')
+    ) # CD70-CD27_panel
+
+  # s.data=s.data %>% group_by(cell_label) %>%
+  #   dplyr::mutate(CD4=ifelse("POS" %in% CD4,'POS','Other'),
+  #          CD8=ifelse("POS" %in% CD8,'POS','Other'),
+  #          CD20=ifelse("POS" %in% CD20,'POS','Other'),
+  #          LAG3=ifelse("POS" %in% LAG3,'POS','Other'),
+  #          FoxP3=ifelse("POS" %in% FoxP3,'POS','Other')
+  #          #PD1=ifelse("POS" %in% PD1,'POS','Other')
+  #          #CD70=ifelse("POS" %in% CD70,'POS','Other'),
+  #          #CD27=ifelse("POS" %in% CD27,'POS','Other')
+  #   ) # combined_panel
+	
+  s.data=s.data[!(duplicated(s.data$cell_label)),]
+  
+  #s.data=s.data[s.data$CD20 != 'POS',]
+  #s.data=s.data[!(s.data$CD4=='POS' & s.data$CD8=='POS'),]
+  #s.data=s.data[s.data$CD8 == 'POS',] 
+  
+  num_cells_tmp=data.frame(Name=s,number=nrow(s.data))
+  if (is.null(num_cells_tmp)) {
+    num_cells=num_cells_tmp
+  } else {
+    num_cells=rbind(num_cells,num_cells_tmp)
+  }
+
+  ############
+
+	for (comp in names(comparisons)) {
+		#cat(paste0("\nProcessing comparison: ", comp, "\n\n"))
+		pheno1 = with(comparisons[[comp]],
+									PhenExp$new(name = phenotype1, posMarkers = phenotype1PosMarkers, negMarkers = phenotype1NegMarkers, 
+															category = phenotype1Category, nickname = phenotype1Nickname, color = phenotype1Color, 
+															expression = phenotype1ExpressionName, threshold = phenotype1ExpressionThreshold))
+
+		pheno2 = with(comparisons[[comp]],
+									PhenExp$new(name = phenotype2, posMarkers = phenotype2PosMarkers, negMarkers = phenotype2NegMarkers, 
+															category = phenotype1Category, nickname = phenotype2Nickname, color = phenotype2Color, 
+															expression = phenotype2ExpressionName, threshold = phenotype2ExpressionThreshold))
+		
+		# # Get point pattern datasets and distance matrices; direction matters... (distance analysis)
+		# # from tumor to tme
+		# phenoData12 = getPhenotypes(s.data, pheno1, pheno2)
+		# # from tme to tumor
+		# #phenoData12 = getPhenotypes(s.data, pheno2, pheno1)
+		# 
+		# nnDist12 = data.table(findExpressionDistance(phenoData12))
+		# if (nrow(nnDist12) < 1) { print("No tumor cells (CD20+) found"); next }
+		# 
+		# nnDist12 <- filter(nnDist12, Distance != Inf)
+		# if (nrow(nnDist12) < 1) { print("No category 2 cells found"); next }
+		# 
+		# #print(nnPlot(phenoData12, nnDist12))
+		# 
+		# nnDist12 <- cbind(Sample = s, Comparison = comp, nnDist12[,c("From_Cell_ID", "To_Cell_ID", "Distance")])
+		# if (nrow(nn.all) < 1) { nn.all <- nnDist12 } else { nn.all <- rbind(nn.all, nnDist12) }
+		
+		# for touching cell proportion (neighborhood analysis)
+		# Get point pattern datasets and proportion matrices; direction matters...
+		phenoData12 = getPhenotypes(s.data, pheno1, pheno2)
+
+		# check if there are cells for To and From
+		if (nrow(phenoData12$dataFrom)==0 | nrow(phenoData12$dataTo)==0) {
+		  next
+		  cat("\n\n")
+		}
+
+		nnDist12 = data.table(findProportion(phenoData12, s.data, 125))
+
+		#print(nnPlot(phenoData12, nnDist12))
+
+		nnDist12 <- cbind(Sample = s, Comparison = comp, nnDist12[,c("source", "Proportion")])
+		if (nrow(prop.all) < 1) { prop.all <- nnDist12 } else { prop.all <- rbind(prop.all, nnDist12) }
+		
+		cat("\n\n")
+	}
+}
+
+## self add ##
+if (panel=='IHC_CD70-CD27_combined_panel' | panel=='IHC_CD70-CD27_panel') {
+  tp=colsplit(nn.all$Sample,'_',names = c('1','2','core','4'))
+} else if (panel=='IHC_combined_panel') {
+  tp=colsplit(nn.all$Sample,'_',names = c('1','2','core1','core2','5'))
+} else {
+  tp=colsplit(nn.all$Sample,'_',names = c('1','2','3','core','5'))
+}
+
+if (panel=='IHC_combined_panel') {
+  nn.all$core=ifelse(startsWith(tp$core1,'Core'),tp$core1,tp$core2)
+} else {
+  nn.all$core=tp$core
+}
+
+# #nn.all <- mutate(nn.all, Distance_microns = Distance * 4)
+# #nn.all <- cbind(nn.all, sample.data[match(nn.all$core, sample.data$core),c("Pathology", "Type", "COO", "MHCIStatus", "MHCIIStatus", "Transformation_code")])
+# nn.all <- cbind(nn.all, sample.data[match(nn.all$core, sample.data$core),c("study_id", "timepoint")])
+# 
+# # remove batch 1, 7, 14
+# nn.all <- nn.all[!(nn.all$study_id %in% c('cont01','cont07','cont14','Pair_01_LBCL','Pair_01_FL','Pair_07_FL','Pair_07_LBCL','Pair_14_FL','Pair_14_LBCL')),]
+# 
+# nn.all=nn.all[!(is.na(nn.all$timepoint)),]
+
+# Write average nn distances to file
+# nn.avg <- nn.all %>%
+# 	group_by(Sample, Comparison) %>%
+# 	summarize(average_NN_dist = mean(Distance))
+#
+# write.table(nn.avg, file = paste0(working.dir, "results/average_NN_distances_per_sample.txt"), quote = F, sep = "\t",
+# 						row.names = FALSE, col.names = TRUE)
+
+
+# for touching cell proportion (neighborhood analysis)
+if (panel=='IHC_CD70-CD27_combined_panel' | panel=='IHC_CD70-CD27_panel') {
+  tp=colsplit(prop.all$Sample,'_',names = c('1','2','core','4'))
+} else {
+  tp=colsplit(prop.all$Sample,'_',names = c('1','2','3','core','5'))
+}
+#
+prop.all$core=tp$core
+#
+# nn.all <- mutate(nn.all, Distance_microns = Distance * 4)
+# nn.all <- cbind(nn.all, sample.data[match(nn.all$core, sample.data$core),c("Pathology", "Type", "COO", "MHCIStatus", "MHCIIStatus", "Transformation_code")])
+prop.all <- cbind(prop.all, sample.data[match(prop.all$core, sample.data$core),c("study_id", "timepoint")])
+prop.all <- prop.all[!(is.na(prop.all$timepoint)),]
+
+#write.table(nn.avg, file = paste0(working.dir, "results/average_NN_distances_per_sample.txt"), quote = F, sep = "\t",
+#						row.names = FALSE, col.names = TRUE)
+
+```
+
+## Summary plots
+
+```{r fig.width=4,fig.height=4}
+pal=c("#DF8F44","#00A1D5","#B24745")
+names(pal)=c('cont','FL','DLBCL')
+
+# average nn distance plot (distance analysis)
+plot.nn <- function(plot.data, plot.name, plot.group, plot.comparisons) {
+  # treat each core as a sample
+	# plot.nn.avg <- plot.data %>%
+	# 	filter(!is.na(get(plot.group))) %>%
+	# 	group_by_at(vars(c("Sample", "Comparison", plot.group))) %>%
+	# 	dplyr::summarize(average_NN_dist = mean(Distance))
+	
+	# take average of 2 cores for each patient
+	# tp=colsplit(plot.nn.avg$Sample,'_',names = c('1','2','3','core','5'))
+	# plot.nn.avg$core=tp$core
+	# plot.nn.avg=plot.nn.avg %>% left_join(sample.data[,1:2],by='core')
+	
+	plot.nn.avg <- plot.data %>%
+		filter(!is.na(get(plot.group))) %>%
+		group_by_at(vars(c("study_id", "Comparison", plot.group))) %>%
+		dplyr::summarize(average_NN_dist = mean(Distance))
+	
+	# order timepoint
+	plot.nn.avg$timepoint = factor(plot.nn.avg$timepoint, levels = c('cont','FL','DLBCL'))   
+	
+  # #order comparisons for CD70-CD27 panel CD4+
+  # plot.nn.avg$Comparison=factor(plot.nn.avg$Comparison,levels =
+  #                        c('CD20+ to CD4+CD8-',
+  #                          'CD20+ to CD4+CD8-LAG3+',
+  #                          'CD70+CD20+ to CD4+CD8-LAG3+CD27+',
+  #                          'CD70-CD20+ to CD4+CD8-LAG3+CD27-',
+  #                          'CD20+ to CD4+CD8-FoxP3+',
+  #                          'CD70+CD20+ to CD4+CD8-FoxP3+CD27+',
+  #                          'CD70-CD20+ to CD4+CD8-FoxP3+CD27-'
+  #                          ))
+
+  #order comparisons for CD70-CD27 panel CD8+
+  plot.nn.avg$Comparison=factor(plot.nn.avg$Comparison,levels =
+                         c(#'CD20+ to CD4-CD8+',
+                           'CD20+ to CD4-CD8+LAG3+',
+                           'CD20+ to CD4-CD8+LAG3+CD27+',
+                           'CD20+ to CD4-CD8+LAG3+CD27-',
+                           'CD70+CD20+ to CD4-CD8+LAG3+CD27+',
+                           'CD70-CD20+ to CD4-CD8+LAG3+CD27-'
+                           ))
+
+  	
+	#order comparisons for CD10-CD20 panel CD4+
+  # plot.nn.avg$Comparison=factor(plot.nn.avg$Comparison,levels =
+  #                        c(#'CD20+ to CD4+CD8-',
+  #                          #'CD20+ to CD4+CD8-PD1+',
+  #                          #'tmp',
+  #                          'CD20+ to CD4+CD8-FoxP3+',
+  #                          'CD20+ to CD4+CD8-FoxP3+PD1+',
+  #                          "CD20+ to CD4+CD8-FoxP3+PD1-",
+  #                          'CD20+ to CD4+CD8-LAG3+',
+  #                          'CD20+ to CD4+CD8-LAG3+PD1+',
+  #                          'CD20+ to CD4+CD8-LAG3+PD1-'
+  #                          ))
+  # 
+  #order comparisons for CD10-CD20 panel CD8+
+  # plot.nn.avg$Comparison=factor(plot.nn.avg$Comparison,levels =
+  #                        c(#'CD20+ to CD4-CD8+',
+  #                          #'CD20+ to CD4-CD8+PD1+',
+  #                          'CD20+ to CD4-CD8+LAG3+',
+  #                          'CD20+ to CD4-CD8+LAG3+PD1+',
+  #                          'CD20+ to CD4-CD8+LAG3+PD1-'
+  #                          ))
+	
+  # order comparisons for TFH panel 
+  # plot.nn.avg$Comparison=factor(plot.nn.avg$Comparison,levels =
+  #                        c('CD20+ to CD4+PD1+',
+  #                          'CD20+ to CD4+BCL6+',
+  #                          'CD20+ to CD4+BCL6+PD1+',
+  #                          'CD20+ to CD4+CXCR5+PD1+',
+  #                          'CD20+ to CD4+CXCR5+BCL6+PD1+'
+  #                          ))
+	
+	# order comparisons for combined panel CD4+
+  # plot.nn.avg$Comparison= factor(plot.nn.avg$Comparison,levels =
+  #                        c('CD20+ to CD4+CD8-',
+  #                          'CD20+ to CD4+CD8-FoxP3+',
+  #                          'CD20+ to CD4+CD8-LAG3+'
+  #                         ))
+
+  
+	nn.avg.plot <- ggplot(plot.nn.avg, aes_string(x = plot.group, y = "average_NN_dist", color = plot.group)) +
+		geom_boxplot(outlier.colour = 'NA') +
+	  geom_point(size = 1, color='black', position = "jitter") + 
+	  #geom_jitter() +
+	  # add mean distance
+	  stat_summary(fun.y=mean, colour="darkred", geom="point", hape=18, size=2,show_guide = FALSE) +
+    stat_summary(fun.y=mean, colour="red", geom="text", show_guide = FALSE, vjust=-0.7, size=2, aes( label=round(..y.., digits=2))) +
+		facet_wrap(~Comparison, nrow = 1) +
+		stat_compare_means(method = "t.test", label = "p.format", comparisons = plot.comparisons, size=2) +
+		labs(y = "Average NN distance (microns)", title = paste0(plot.name, " tissue region")) +
+		scale_y_continuous(expand = expand_scale(mult = c(0.05, 0.1))) +
+		scale_color_manual(values = pal) +
+	  theme_bw() +
+		theme(legend.position = "none",text = element_text(size=10)) 
+	
+	pdf(paste0(plot.dir, plot.name, "_average_NN_average_core_by_", plot.group, ".pdf"), width = 4, height = 2.5)
+	print(nn.avg.plot)
+	dev.off()
+	
+	print(nn.avg.plot)
+}
+
+
+# Plot distance in all cells by pathology
+plot.nn(plot.data = nn.all, plot.name = paste0(panel,": CD20+"), plot.group = "timepoint",
+				plot.comparisons = list(c("DLBCL", "FL"), c("FL", "cont"), c("DLBCL", "cont")))
+
+# # Plot distance in DLBCL cells by COO, MHCIStatus
+# nn.dlbcl <- filter(nn.all, Pathology == "DLBCL")
+# plot.nn(plot.data = nn.dlbcl, plot.name = "DLBCL", plot.group = "COO", 
+# 				plot.comparisons = list(c("ABC-DLBCL", "GCB-DLBCL"), c("GCB-DLBCL", "Unclassified"), c("ABC-DLBCL", "Unclassified")))
+# 
+# plot.nn(plot.data = nn.dlbcl, plot.name = "DLBCL", plot.group = "MHCIStatus", plot.comparisons = list(c("NEG", "POS")))
+# 
+# # Plot distance in FL cells by primary/relapse, transformed/non-transformed
+# nn.fl <- filter(nn.all, Pathology == "FL")
+# plot.nn(plot.data = nn.fl, plot.name = "FL", plot.group = "Type", plot.comparisons = list(c("Primary", "Relapse")))
+# 
+# plot.nn(plot.data = nn.fl, plot.name = "FL", plot.group = "Transformation_code", plot.comparisons = list(c("0", "1")))
+
+# touching cell proportion plot (for neighborhood analysis)
+plot.prop <- function(plot.data, plot.name, plot.group, plot.comparisons) {
+  
+  # remove 0% CD20- 
+  #plot.data = plot.data[plot.data$Proportion!=0,]
+  
+  plot.nn.avg <- plot.data %>%
+		filter(!is.na(get(plot.group))) %>%
+		group_by_at(vars(c("study_id", "Comparison", plot.group))) %>%
+		dplyr::summarize(average_NN_dist = mean(Proportion))
+  
+  # order timepoint
+	plot.nn.avg$timepoint = factor(plot.nn.avg$timepoint, levels = c('cont','FL','DLBCL'))  
+	
+	# #order comparisons for CD70-CD27 panel CD4+
+  # plot.nn.avg$Comparison=factor(plot.nn.avg$Comparison,levels =
+  #                        c('CD20+ to CD4+CD8-',
+  #                          'CD20+ to CD4+CD8-LAG3+',
+  #                          'CD70+CD20+ to CD4+CD8-LAG3+CD27+',
+  #                          'CD70-CD20+ to CD4+CD8-LAG3+CD27-',
+  #                          'CD20+ to CD4+CD8-FoxP3+',
+  #                          'CD70+CD20+ to CD4+CD8-FoxP3+CD27+',
+  #                          'CD70-CD20+ to CD4+CD8-FoxP3+CD27-'
+  #                          ))
+
+  #order comparisons for CD70-CD27 panel CD8+
+  plot.nn.avg$Comparison=factor(plot.nn.avg$Comparison,levels =
+                         c('CD20+ to CD4-CD8+',
+                           'CD20+ to CD4-CD8+LAG3+',
+                           'CD20+ to CD4-CD8+LAG3+CD27+',
+                           'CD20+ to CD4-CD8+LAG3+CD27-',
+                           'CD70+CD20+ to CD4-CD8+LAG3+CD27+',
+                           'CD70-CD20+ to CD4-CD8+LAG3+CD27-'
+                           ))
+
+  	
+	#order comparisons for CD10-CD20 panel CD4+
+  # plot.nn.avg$Comparison=factor(plot.nn.avg$Comparison,levels =
+  #                        c(#'CD20+ to CD4+CD8-',
+  #                          #'CD20+ to CD4+CD8-PD1+',
+  #                          #'tmp',
+  #                          'CD20+ to CD4+CD8-FoxP3+',
+  #                          'CD20+ to CD4+CD8-FoxP3+PD1+',
+  #                          "CD20+ to CD4+CD8-FoxP3+PD1-",
+  #                          'CD20+ to CD4+CD8-LAG3+',
+  #                          'CD20+ to CD4+CD8-LAG3+PD1+',
+  #                          'CD20+ to CD4+CD8-LAG3+PD1-'
+  #                          ))
+  # 
+  #order comparisons for CD10-CD20 panel CD8+
+  # plot.nn.avg$Comparison=factor(plot.nn.avg$Comparison,levels =
+  #                        c(#'CD20+ to CD4-CD8+',
+  #                          #'CD20+ to CD4-CD8+PD1+',
+  #                          'CD20+ to CD4-CD8+LAG3+',
+  #                          'CD20+ to CD4-CD8+LAG3+PD1+',
+  #                          'CD20+ to CD4-CD8+LAG3+PD1-'
+  #                          ))
+	
+  # order comparisons for TFH panel 
+  # plot.nn.avg$Comparison=factor(plot.nn.avg$Comparison,levels =
+  #                        c('CD20+ to CD4+BCL6+',
+  #                          'CD20+ to CD4+CXCR5+',
+  #                          'CD20+ to CD4+CXCR5+PD1+',
+  #                          'CD20+ to CD4+CXCR5+BCL6+',
+  #                          'CD20+ to CD4+CXCR5+BCL6+PD1+',
+  #                          'CD20+ to CD4+CXCR5+BCL6+PD1+CXCL13+'
+  #                          ))
+	
+	# order comparisons for combined panel CD4+
+  # plot.nn.avg$Comparison=factor(plot.nn.avg$Comparison,levels =
+  #                        c('CD20+ to CD4+CD8-',
+  #                          'CD20+ to CD4+CD8-FoxP3+',
+  #                          'CD20+ to CD4+CD8-LAG3+'
+  #                         ))
+	
+	nn.avg.plot <- ggplot(plot.nn.avg, aes_string(x = plot.group, y = "average_NN_dist", color = plot.group)) +
+		geom_boxplot(outlier.shape = NA) +
+	  geom_point(size = 1, color='black', position = "jitter") + 
+	  #geom_jitter(color="black", size=0.4) +
+		stat_summary(fun.y=mean, colour="darkred", geom="point", hape=18, size=2,show_guide = FALSE) +
+    stat_summary(fun.y=mean, colour="red", geom="text", show_guide = FALSE, vjust=-0.7, size=2, aes( label=round(..y.., digits=3))) +
+		facet_wrap(~Comparison, nrow = 1) +
+		stat_compare_means(method = "t.test", label = "p.format", comparisons = plot.comparisons, size=2) +
+		labs(y = "Proportion of cells within 125 microns", title = paste0(plot.name, " tissue region")) +
+		scale_y_continuous(expand = expand_scale(mult = c(0.05, 0.1))) +
+		scale_color_manual(values = pal) +
+	  theme_bw() +
+		theme(legend.position = "none",text = element_text(size=10)) 
+	
+	pdf(paste0(plot.dir, plot.name, "_proportion_by_", plot.group, ".pdf"), width = 6, height = 2.5)
+	print(nn.avg.plot)
+	dev.off()
+	
+	print(nn.avg.plot)
+}
+
+# Plot proportion in all cells by pathology
+plot.prop(plot.data = prop.all, plot.name = paste0(panel,": CD20+"), plot.group = "timepoint",
+				plot.comparisons = list(c("DLBCL", "FL"), c("FL", "cont"), c("DLBCL", "cont")))
+```
